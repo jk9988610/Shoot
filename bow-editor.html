@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>弓身绘制工具 — Particle Archery</title>
-  <link rel="stylesheet" href="css/bow-editor.css?v=0.4.0">
+  <link rel="stylesheet" href="css/bow-editor.css?v=0.4.1">
 </head>
 <body>
   <header class="editor-header">
@@ -42,10 +42,12 @@
 
       <h2>操作</h2>
       <div class="action-group">
+        <button type="button" id="btn-push-game" class="btn-primary">⬆ 更新到游戏</button>
         <button type="button" id="btn-undo">撤销</button>
         <button type="button" id="btn-reset-view">重置视图</button>
         <button type="button" id="btn-clear">清空</button>
       </div>
+      <p id="push-status" class="push-status"></p>
 
       <div class="meta-info">
         <div class="meta-section">绘制层</div>
@@ -83,6 +85,6 @@
     </section>
   </main>
 
-  <script type="module" src="js/bow-editor.js?v=0.4.0"></script>
+  <script type="module" src="js/bow-editor.js?v=0.4.1"></script>
 </body>
 </html>

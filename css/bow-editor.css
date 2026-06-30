@@ -172,6 +172,33 @@ h2:first-child {
   border-color: #4ecca3;
 }
 
+.btn-primary {
+  width: 100%;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 10px 8px;
+  background: #e94560;
+  color: #fff;
+  border: 2px solid #ff6688;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+
+.btn-primary:hover {
+  background: #ff5577;
+}
+
+.push-status {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 8px;
+  min-height: 1.4em;
+}
+
+.push-status.ok {
+  color: #4ecca3;
+}
+
 .color-swatch {
   width: 26px;
   height: 26px;

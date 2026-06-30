@@ -1,5 +1,10 @@
 import { MATERIALS } from './particle.js';
 import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
+import { resolveBowData } from './update-channel.js';
+
+function getBowData() {
+  return resolveBowData(CUSTOM_BOW_DATA).data;
+}
 
 /**
  * 弓 — 横屏剖面视角，支持自定义绘制数据
@@ -18,9 +23,13 @@ export class Bow {
     this.maxDraw = 70;
     this.isDrawing = false;
     this.drawAmount = 0;
-    this.stringOffsetX = CUSTOM_BOW_DATA.stringOffsetX;
+    this.stringOffsetX = getBowData().stringOffsetX;
 
     this._build();
+  }
+
+  static getDataSource() {
+    return resolveBowData(CUSTOM_BOW_DATA);
   }
 
   _build() {
@@ -30,7 +39,7 @@ export class Bow {
   _buildFromCustom() {
     const cx = this.x;
     const cy = this.groundY - 52;
-    const data = CUSTOM_BOW_DATA;
+    const data = getBowData();
     const placed = [];
     const map = new Map();
 

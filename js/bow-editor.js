@@ -3,6 +3,8 @@ import { GridModel } from './editor/grid-model.js';
 import { fromApplyData, generateExportCode, toApplyData } from './editor/apply.js';
 import { Viewport } from './editor/viewport.js';
 import { GridRenderer } from './editor/grid-renderer.js';
+import { pushBowToGame } from './update-channel.js';
+import { VERSION } from './version.js';
 
 const WOOD_COLORS = ['#6B3A1F', '#8B4513', '#A0522D', '#7A4A2E'];
 
@@ -339,6 +341,34 @@ function bindUI() {
     a.download = 'custom-bow-data.js';
     a.click();
     URL.revokeObjectURL(a.href);
+  });
+
+  document.getElementById('btn-push-game').addEventListener('click', () => {
+    const apply = toApplyData(model);
+    if (!apply.nockTop || !apply.nockBottom) {
+      alert('请先设置上梢和下梢');
+      return;
+    }
+    if (apply.particles.length === 0) {
+      alert('请至少绘制一个弓身粒子');
+      return;
+    }
+    const payload = pushBowToGame(apply);
+    exportCode.value = generateExportCode(model);
+    const status = document.getElementById('push-status');
+    if (status) {
+      status.textContent = `已推送 ${payload.particleCount} 粒子 → 游戏待更新`;
+      status.className = 'push-status ok';
+    }
+    const open = confirm(
+      `弓身已推送到游戏（${payload.particleCount} 粒子）。\n\n确定：打开游戏并自动更新\n取消：稍后手动在游戏页点「更新」`
+    );
+    if (open) {
+      const url = new URL('index.html', location.href);
+      url.searchParams.set('v', VERSION);
+      url.searchParams.set('_', String(Date.now()));
+      location.href = url.toString();
+    }
   });
 }
 

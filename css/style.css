@@ -80,6 +80,65 @@ body {
   color: #16213e;
 }
 
+#update-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 8px 12px;
+  background: #0f3460;
+  color: #87CEEB;
+  border: 2px solid #5BA3D9;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+}
+
+#update-btn:hover {
+  background: #1a4a7a;
+}
+
+#update-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+#update-btn.has-pending {
+  border-color: #ffd700;
+  color: #ffd700;
+  animation: pulse-border 1.2s ease infinite;
+}
+
+#update-btn.has-pending::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  background: #ffd700;
+  border-radius: 50%;
+}
+
+@keyframes pulse-border {
+  50% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+}
+
+.update-status {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 6px;
+  color: #666;
+  max-width: 100px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.update-status.pending {
+  color: #ffd700;
+}
+
+.update-status.ok {
+  color: #4ecca3;
+}
+
 .editor-link {
   font-family: 'Press Start 2P', monospace;
   font-size: 7px;

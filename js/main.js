@@ -7,6 +7,8 @@ import { Target } from './target.js';
 import { InputHandler } from './input.js';
 import { VERSION, BUILD_LABEL } from './version.js';
 import { debug, debugGroup, initDebugPanel, initPageGuards, logBoot } from './debug.js';
+import { initUpdateButton } from './game-update.js';
+import { clearPendingBowUpdate } from './update-channel.js';
 
 class Game {
   constructor() {
@@ -46,7 +48,13 @@ class Game {
 
   _logInit() {
     logBoot();
+    const bowSource = Bow.getDataSource();
+    if (bowSource.source === 'local') {
+      clearPendingBowUpdate();
+    }
     debugGroup('初始化', () => {
+      debug('init', `版本 v${VERSION} (${BUILD_LABEL})`);
+      debug('init', `弓身来源: ${bowSource.source}`, bowSource.meta ?? {});
       debug('init', `画布 ${this.canvas.width}×${this.canvas.height}`);
       debug('init', `地面 Y=${this.physics.groundY}`);
       debug('init', `弓位置 x=${this.bow.x}, 弦心`, this.bow.getStringCenter());
@@ -223,5 +231,6 @@ class Game {
 window.addEventListener('DOMContentLoaded', () => {
   initPageGuards();
   initDebugPanel();
+  initUpdateButton();
   new Game();
 });
