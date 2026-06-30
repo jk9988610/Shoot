@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>粒子弓箭世界 v0.2.1 — Particle Archery</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>粒子弓箭世界 v0.2.2 — Particle Archery</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -12,42 +12,38 @@
       <h1>⬛ 粒子弓箭世界</h1>
       <p>所有物品由最小粒子构成 · 横屏剖面视角 · 拉弓射箭</p>
     </div>
-    <button id="debug-toggle-btn" type="button">调试</button>
+    <button id="debug-toggle-btn" type="button" class="active">隐藏调试</button>
   </div>
 
   <div id="app-body">
-    <div id="game-container">
-      <canvas id="game-canvas" width="960" height="540"></canvas>
+    <div id="game-column">
+      <div id="game-container">
+        <canvas id="game-canvas" width="960" height="540"></canvas>
 
-      <div id="hud">
-        <div class="hud-panel">
-          <div><span class="label">张力 </span><span class="value" id="tension-value">0%</span></div>
-          <div id="tension-bar-container"><div id="tension-bar"></div></div>
-          <div><span class="label">得分 </span><span class="value" id="score-value">0</span></div>
-          <div><span class="label">箭矢 </span><span class="value" id="arrow-count">∞</span></div>
+        <div id="hud">
+          <div class="hud-panel">
+            <div><span class="label">张力 </span><span class="value" id="tension-value">0%</span></div>
+            <div id="tension-bar-container"><div id="tension-bar"></div></div>
+            <div><span class="label">得分 </span><span class="value" id="score-value">0</span></div>
+            <div><span class="label">箭矢 </span><span class="value" id="arrow-count">∞</span></div>
+          </div>
         </div>
+
+        <div id="phase-badge">阶段 1-5 · 粒子弓射箭 <span id="version-badge">v0.2.2</span></div>
+        <div id="score-popup"></div>
       </div>
 
-      <div id="phase-badge">阶段 1-5 · 粒子弓射箭 <span id="version-badge">v0.2.1</span></div>
-
-      <div id="controls-hint">
-        拖拽弓弦向左拉弓 → 松开射击<br>
-        弓=木质年轮剖面 · 弦=白色 · 靶=迎箭面剖切透镜形
-      </div>
-
-      <div id="score-popup"></div>
+      <aside id="debug-panel">
+        <div id="debug-toolbar">
+          <span id="debug-title">调试日志</span>
+          <div id="debug-actions">
+            <button id="debug-clear-btn" type="button">清空</button>
+            <button id="debug-copy-btn" type="button">复制</button>
+          </div>
+        </div>
+        <div id="debug-log"></div>
+      </aside>
     </div>
-
-    <aside id="debug-panel" class="hidden">
-      <div id="debug-toolbar">
-        <span id="debug-title">调试日志</span>
-        <div id="debug-actions">
-          <button id="debug-clear-btn" type="button">清空</button>
-          <button id="debug-copy-btn" type="button">复制</button>
-        </div>
-      </div>
-      <div id="debug-log"></div>
-    </aside>
   </div>
 
   <script type="module" src="js/main.js"></script>

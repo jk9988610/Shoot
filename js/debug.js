@@ -6,7 +6,8 @@ const MAX_LINES = 500;
 
 let logEl = null;
 let logs = [];
-let panelVisible = false;
+let panelVisible = true;
+const pendingLines = [];
 
 function formatArg(arg) {
   if (arg === null) return 'null';
@@ -30,7 +31,11 @@ function timestamp() {
 }
 
 function renderLine(category, text) {
-  if (!logEl) return;
+  if (!logEl) {
+    pendingLines.push({ category, text });
+    return;
+  }
+
   const line = document.createElement('div');
   line.className = `debug-line debug-${category}`;
   line.textContent = text;
@@ -42,6 +47,14 @@ function renderLine(category, text) {
   }
 
   logEl.scrollTop = logEl.scrollHeight;
+}
+
+function flushPending() {
+  if (!logEl) return;
+  for (const item of pendingLines) {
+    renderLine(item.category, item.text);
+  }
+  pendingLines.length = 0;
 }
 
 function appendLog(category, ...args) {
@@ -74,6 +87,7 @@ export function debugGroup(label, fn) {
 
 export function clearLogs() {
   logs = [];
+  pendingLines.length = 0;
   if (logEl) logEl.innerHTML = '';
   appendLog('system', '日志已清空');
 }
@@ -104,12 +118,19 @@ export function initDebugPanel() {
   const toggleBtn = document.getElementById('debug-toggle-btn');
   const clearBtn = document.getElementById('debug-clear-btn');
   const copyBtn = document.getElementById('debug-copy-btn');
+  const panel = document.getElementById('debug-panel');
 
   toggleBtn?.addEventListener('click', toggleDebugPanel);
   clearBtn?.addEventListener('click', clearLogs);
   copyBtn?.addEventListener('click', copyLogs);
 
+  flushPending();
   appendLog('version', `粒子弓箭世界 v${VERSION} (${BUILD_LABEL})`);
+
+  panelVisible = true;
+  panel?.classList.remove('hidden');
+  toggleBtn?.classList.add('active');
+  if (toggleBtn) toggleBtn.textContent = '隐藏调试';
 }
 
 export function logBoot() {
@@ -119,5 +140,21 @@ export function logBoot() {
       'color:#e94560;font-weight:bold;font-family:monospace'
     );
   }
-  debug('boot', '调试面板已就绪，点击顶栏「调试」按钮显示/隐藏');
+  debug('boot', '调试面板已就绪');
+}
+
+export function initPageGuards() {
+  document.addEventListener('contextmenu', (e) => {
+    if (!e.target.closest('#debug-panel')) e.preventDefault();
+  });
+
+  document.addEventListener('selectstart', (e) => {
+    if (!e.target.closest('#debug-log')) e.preventDefault();
+  });
+
+  document.addEventListener('copy', (e) => {
+    if (!e.target.closest('#debug-panel')) e.preventDefault();
+  });
+
+  document.addEventListener('dragstart', (e) => e.preventDefault());
 }

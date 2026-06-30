@@ -6,7 +6,7 @@ import { Arrow } from './arrow.js';
 import { Target } from './target.js';
 import { InputHandler } from './input.js';
 import { VERSION, BUILD_LABEL } from './version.js';
-import { debug, debugGroup, initDebugPanel, logBoot } from './debug.js';
+import { debug, debugGroup, initDebugPanel, initPageGuards, logBoot } from './debug.js';
 
 class Game {
   constructor() {
@@ -221,6 +221,7 @@ class Game {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  initPageGuards();
   initDebugPanel();
   new Game();
 });

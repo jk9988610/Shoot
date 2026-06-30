@@ -6,17 +6,26 @@
   box-sizing: border-box;
 }
 
-body {
+html, body {
   background: #1a1a2e;
   color: #e0e0e0;
   font-family: 'Press Start 2P', monospace;
   overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  height: 100vh;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
 #header {
@@ -35,6 +44,19 @@ body {
   flex: 1;
 }
 
+#header h1 {
+  font-size: 14px;
+  color: #e94560;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+#header p {
+  font-size: 8px;
+  color: #a0a0b0;
+  line-height: 1.8;
+}
+
 #debug-toggle-btn {
   font-family: 'Press Start 2P', monospace;
   font-size: 7px;
@@ -44,6 +66,8 @@ body {
   border: 2px solid #4ecca3;
   cursor: pointer;
   flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 #debug-toggle-btn:hover {
@@ -59,41 +83,36 @@ body {
   display: flex;
   flex: 1;
   width: 100%;
-  overflow: hidden;
   min-height: 0;
+  overflow: hidden;
+  justify-content: center;
+  padding: 10px;
 }
 
-#header h1 {
-  font-size: 14px;
-  color: #e94560;
-  letter-spacing: 2px;
-  margin-bottom: 6px;
-}
-
-#header p {
-  font-size: 8px;
-  color: #a0a0b0;
-  line-height: 1.8;
+#game-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
 }
 
 #game-container {
   position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  padding: 10px;
+  flex-shrink: 0;
 }
 
 #game-canvas {
+  display: block;
   border: 4px solid #0f3460;
   background: #87CEEB;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   cursor: crosshair;
-  max-width: 100%;
-  max-height: calc(100vh - 160px);
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 280px);
+  touch-action: none;
 }
 
 #hud {
@@ -135,20 +154,6 @@ body {
   transition: width 0.05s;
 }
 
-#controls-hint {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(22, 33, 62, 0.85);
-  border: 2px solid #0f3460;
-  padding: 8px 16px;
-  font-size: 7px;
-  color: #a0a0b0;
-  text-align: center;
-  line-height: 2;
-}
-
 #phase-badge {
   position: absolute;
   top: 20px;
@@ -158,6 +163,7 @@ body {
   padding: 6px 12px;
   font-size: 7px;
   color: #4ecca3;
+  pointer-events: none;
 }
 
 #score-popup {
@@ -179,12 +185,15 @@ body {
 }
 
 #debug-panel {
-  width: 300px;
+  width: 960px;
+  max-width: calc(100vw - 20px);
+  height: 140px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: #12182b;
-  border-left: 3px solid #0f3460;
+  border: 4px solid #0f3460;
+  border-top: none;
   font-family: 'Courier New', Courier, monospace;
 }
 
@@ -196,7 +205,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 6px 10px;
   background: #16213e;
   border-bottom: 2px solid #0f3460;
   flex-shrink: 0;
@@ -231,19 +240,24 @@ body {
 #debug-log {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
-  font-size: 9px;
-  line-height: 1.6;
-  color: #b0b8c8;
+  overflow-x: hidden;
+  padding: 8px 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d0d8e8;
   min-height: 0;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-touch-callout: default;
 }
 
 .debug-line {
   word-break: break-all;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
+  white-space: pre-wrap;
 }
 
-.debug-version { color: #e94560; }
+.debug-version { color: #ff6b8a; }
 .debug-boot { color: #4ecca3; }
 .debug-init { color: #87CEEB; }
 .debug-state { color: #ffd700; }
@@ -252,6 +266,6 @@ body {
 .debug-hit { color: #4ecca3; font-weight: bold; }
 .debug-miss { color: #e94560; }
 .debug-reset { color: #a0a0b0; }
-.debug-tick { color: #555; }
-.debug-system { color: #888; }
+.debug-tick { color: #666; }
+.debug-system { color: #999; }
 .debug-group { color: #6ab0d4; }
