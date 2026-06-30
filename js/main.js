@@ -5,6 +5,8 @@ import { Bow } from './bow.js';
 import { Arrow } from './arrow.js';
 import { Target } from './target.js';
 import { InputHandler } from './input.js';
+import { VERSION, BUILD_LABEL } from './version.js';
+import { debug, debugGroup, logBoot } from './debug.js';
 
 class Game {
   constructor() {
@@ -28,9 +30,33 @@ class Game {
     this.state = 'ready'; // ready | drawing | flying | resetting
     this.resetTimer = 0;
     this.scorePopupTimer = 0;
+    this._frame = 0;
 
     this._bindUI();
+    this._logInit();
     this._loop();
+  }
+
+  _setState(next, detail = {}) {
+    if (this.state === next) return;
+    const prev = this.state;
+    this.state = next;
+    debug('state', `${prev} → ${next}`, detail);
+  }
+
+  _logInit() {
+    logBoot();
+    debugGroup('初始化', () => {
+      debug('init', `版本 v${VERSION} (${BUILD_LABEL})`);
+      debug('init', `画布 ${this.canvas.width}×${this.canvas.height}`);
+      debug('init', `地面 Y=${this.physics.groundY}`);
+      debug('init', `弓位置 x=${this.bow.x}, 弦心`, this.bow.getStringCenter());
+      debug('init', `靶迎箭面 faceX=${this.target.faceX}, 中心`, {
+        x: this.target.centerX,
+        y: this.target.centerY,
+      });
+      debug('init', `粒子总数 ${this.system.particles.length}`);
+    });
   }
 
   _bindUI() {
@@ -40,16 +66,21 @@ class Game {
       score: document.getElementById('score-value'),
       arrowCount: document.getElementById('arrow-count'),
       scorePopup: document.getElementById('score-popup'),
+      version: document.getElementById('version-badge'),
     };
+    if (this.ui.version) {
+      this.ui.version.textContent = `v${VERSION}`;
+    }
   }
 
   onDrawStart() {
     if (this.state !== 'ready') return;
-    this.state = 'drawing';
+    this._setState('drawing');
     const sc = this.bow.getStringCenter();
     const aim = this.target.getAimPoint();
     const angle = Math.atan2(aim.y - sc.y, aim.x - sc.x);
     this.arrow.nockTo(sc.x, sc.y, angle);
+    debug('input', '开始拉弓', { string: { x: sc.x, y: sc.y }, aim, angle: angle.toFixed(3) });
   }
 
   onDrawing() {
@@ -78,7 +109,14 @@ class Game {
     const vy = Math.sin(angle) * speed + launch.vy;
 
     this.arrow.launch(vx, vy);
-    this.state = 'flying';
+    this._setState('flying');
+
+    debug('launch', '射箭', {
+      tension: launch.tension.toFixed(2),
+      speed: speed.toFixed(2),
+      velocity: { vx: vx.toFixed(2), vy: vy.toFixed(2) },
+      angle: angle.toFixed(3),
+    });
 
     this.ui.tension.textContent = '0%';
     this.ui.tensionBar.style.width = '0%';
@@ -100,8 +138,12 @@ class Game {
         this.score += finalScore;
         this.ui.score.textContent = this.score;
         this._showScorePopup(finalScore);
-        this.state = 'resetting';
+        this._setState('resetting', { reason: 'hit', score: finalScore });
         this.resetTimer = 90;
+        debug('hit', `命中 +${finalScore}`, {
+          tip: this.arrow.getTipPosition(),
+          totalScore: this.score,
+        });
       }
 
       const tip = this.arrow.getTipPosition();
@@ -110,8 +152,9 @@ class Game {
         tip.y > this.physics.groundY ||
         tip.x < -50
       ) {
-        this.state = 'resetting';
+        this._setState('resetting', { reason: 'miss' });
         this.resetTimer = 60;
+        debug('miss', '箭矢脱靶', { tip });
       }
     }
 
@@ -137,7 +180,8 @@ class Game {
     const sc = this.bow.getStringCenter();
     this.arrow.reset(sc.x, sc.y);
     this.arrow.nockTo(sc.x, sc.y, 0);
-    this.state = 'ready';
+    this._setState('ready');
+    debug('reset', '回合重置', { string: { x: sc.x, y: sc.y } });
   }
 
   _render() {
@@ -161,8 +205,18 @@ class Game {
   }
 
   _loop() {
+    this._frame++;
     this._update();
     this._render();
+
+    if (this._frame % 300 === 0) {
+      debug('tick', `frame=${this._frame}`, {
+        state: this.state,
+        particles: this.system.getActiveParticles().length,
+        score: this.score,
+      });
+    }
+
     requestAnimationFrame(() => this._loop());
   }
 }

@@ -137,6 +137,7 @@ body {
   transition: opacity 0.3s;
 }
 
-#score-popup.show {
-  opacity: 1;
+#version-badge {
+  color: #a0a0b0;
+  margin-left: 6px;
 }
