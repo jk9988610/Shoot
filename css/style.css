@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'Press Start 2P', monospace;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+#header {
+  padding: 12px 20px;
+  text-align: center;
+  background: #16213e;
+  border-bottom: 3px solid #0f3460;
+  width: 100%;
+}
+
+#header h1 {
+  font-size: 14px;
+  color: #e94560;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+#header p {
+  font-size: 8px;
+  color: #a0a0b0;
+  line-height: 1.8;
+}
+
+#game-container {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px;
+}
+
+#game-canvas {
+  border: 4px solid #0f3460;
+  background: #87CEEB;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: crosshair;
+  max-width: 100%;
+  max-height: calc(100vh - 160px);
+}
+
+#hud {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  pointer-events: none;
+}
+
+.hud-panel {
+  background: rgba(22, 33, 62, 0.85);
+  border: 2px solid #0f3460;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  font-size: 8px;
+  line-height: 2;
+}
+
+.hud-panel .label {
+  color: #a0a0b0;
+}
+
+.hud-panel .value {
+  color: #e94560;
+}
+
+#tension-bar-container {
+  width: 120px;
+  height: 10px;
+  background: #0f3460;
+  border: 1px solid #533483;
+  margin-top: 4px;
+}
+
+#tension-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4ecca3, #e94560);
+  transition: width 0.05s;
+}
+
+#controls-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(22, 33, 62, 0.85);
+  border: 2px solid #0f3460;
+  padding: 8px 16px;
+  font-size: 7px;
+  color: #a0a0b0;
+  text-align: center;
+  line-height: 2;
+}
+
+#phase-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(22, 33, 62, 0.85);
+  border: 2px solid #4ecca3;
+  padding: 6px 12px;
+  font-size: 7px;
+  color: #4ecca3;
+}
+
+#score-popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  color: #ffd700;
+  text-shadow: 3px 3px 0 #e94560;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+#score-popup.show {
+  opacity: 1;
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>粒子弓箭世界 — Particle Archery</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="header">
+    <h1>⬛ 粒子弓箭世界</h1>
+    <p>所有物品由最小粒子构成 · 横屏剖面视角 · 拉弓射箭</p>
+  </div>
+
+  <div id="game-container">
+    <canvas id="game-canvas" width="960" height="540"></canvas>
+
+    <div id="hud">
+      <div class="hud-panel">
+        <div><span class="label">张力 </span><span class="value" id="tension-value">0%</span></div>
+        <div id="tension-bar-container"><div id="tension-bar"></div></div>
+        <div><span class="label">得分 </span><span class="value" id="score-value">0</span></div>
+        <div><span class="label">箭矢 </span><span class="value" id="arrow-count">∞</span></div>
+      </div>
+    </div>
+
+    <div id="phase-badge">阶段 1-5 · 粒子弓射箭</div>
+
+    <div id="controls-hint">
+      拖拽弓弦拉弓 → 松开射击<br>
+      棕色=木质 · 白色=纤维/羽毛 · 剖面可见内部粒子
+    </div>
+
+    <div id="score-popup"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
