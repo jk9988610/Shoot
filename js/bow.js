@@ -35,8 +35,9 @@ export class Bow {
     const map = new Map();
 
     for (const pt of data.particles) {
+      const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -2 && pt.dx <= 0);
       const p = this.system.addParticle(cx + pt.dx, cy + pt.dy, MATERIALS.WOOD, {
-        pinned: !!pt.pinned,
+        pinned,
         owner: 'bow',
         color: pt.color,
         radius: 1.2,
@@ -44,7 +45,7 @@ export class Bow {
       placed.push({ p, dx: pt.dx, dy: pt.dy });
       map.set(`${pt.dx},${pt.dy}`, p);
       this.particles.push(p);
-      if (pt.pinned) this.gripParticles.push(p);
+      if (pinned) this.gripParticles.push(p);
     }
 
     this._linkAdjacentParticles(placed, map);
