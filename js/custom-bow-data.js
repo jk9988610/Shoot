@@ -1,6 +1,7 @@
 /**
- * 自定义弓身数据 — 对称优化弓形
+ * 自定义弓身数据
  * 网格系统生成 · 上/下弓臂严格镜像 · 1格=2px
+ * 绘制层(网格) → 应用层(游戏坐标)，1格 = 2px
  */
 export const CUSTOM_BOW_DATA = {
   version: 1,
@@ -46,8 +47,12 @@ export const CUSTOM_BOW_DATA = {
     { dx: -2, dy: -16, color: '#8B4513' },
     { dx: -2, dy: -12, color: '#7A4A2E' },
     { dx: 0, dy: -12, color: '#A0522D' },
+    { dx: -2, dy: -10, color: '#8B4513' },
+    { dx: 0, dy: -10, color: '#6B3A1F' },
+    { dx: 2, dy: -10, color: '#8B4513' },
     { dx: -2, dy: -8, color: '#7A4A2E' },
     { dx: 0, dy: -8, color: '#8B4513' },
+    { dx: 2, dy: -8, color: '#8B4513' },
     { dx: -2, dy: -6, color: '#8B4513' },
     { dx: 0, dy: -6, color: '#6B3A1F' },
     { dx: 2, dy: -6, color: '#8B4513' },
@@ -57,9 +62,9 @@ export const CUSTOM_BOW_DATA = {
     { dx: -2, dy: -2, color: '#8B4513' },
     { dx: 0, dy: -2, color: '#6B3A1F' },
     { dx: 2, dy: -2, color: '#8B4513' },
-    { dx: -2, dy: 0, color: '#8B4513', pinned: true },
-    { dx: 0, dy: 0, color: '#6B3A1F', pinned: true },
-    { dx: 2, dy: 0, color: '#8B4513', pinned: true },
+    { dx: -2, dy: 0, color: '#8B4513' },
+    { dx: 0, dy: 0, color: '#6B3A1F' },
+    { dx: 2, dy: 0, color: '#8B4513' },
     { dx: -2, dy: 2, color: '#8B4513', pinned: true },
     { dx: 0, dy: 2, color: '#6B3A1F', pinned: true },
     { dx: 2, dy: 2, color: '#8B4513', pinned: true },
@@ -69,8 +74,8 @@ export const CUSTOM_BOW_DATA = {
     { dx: -2, dy: 6, color: '#8B4513', pinned: true },
     { dx: 0, dy: 6, color: '#6B3A1F', pinned: true },
     { dx: 2, dy: 6, color: '#8B4513', pinned: true },
-    { dx: -2, dy: 8, color: '#8B4513', pinned: true },
-    { dx: 0, dy: 8, color: '#6B3A1F', pinned: true },
+    { dx: -2, dy: 8, color: '#7A4A2E', pinned: true },
+    { dx: 0, dy: 8, color: '#8B4513', pinned: true },
     { dx: 2, dy: 8, color: '#8B4513', pinned: true },
     { dx: -2, dy: 10, color: '#8B4513', pinned: true },
     { dx: 0, dy: 10, color: '#6B3A1F', pinned: true },
