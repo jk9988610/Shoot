@@ -17,6 +17,7 @@ const state = {
   stringDx: null,
   lineStart: null,
   linePreview: null,
+  anchorDragging: false,
   history: [],
 };
 
@@ -117,42 +118,36 @@ function placeLine(x0, y0, x1, y1) {
 function shiftAnchor(newX, newY) {
   const oldX = state.anchorX;
   const oldY = state.anchorY;
+  if (oldX === newX && oldY === newY) return false;
 
   const shiftRel = (pt) => {
     if (!pt) return null;
-    const ax = oldX + pt.dx;
-    const ay = oldY + pt.dy;
-    return { dx: ax - newX, dy: ay - newY };
+    return { dx: oldX + pt.dx - newX, dy: oldY + pt.dy - newY };
   };
 
   const next = new Map();
   for (const p of state.particles.values()) {
-    const ax = oldX + p.dx;
-    const ay = oldY + p.dy;
-    const dx = ax - newX;
-    const dy = ay - newY;
-    next.set(key(dx, dy), { ...p, dx, dy });
+    const dx = oldX + p.dx - newX;
+    const dy = oldY + p.dy - newY;
+    const k = key(dx, dy);
+    if (!next.has(k)) {
+      next.set(k, { ...p, dx, dy });
+    }
   }
 
   state.particles = next;
   state.nockTop = shiftRel(state.nockTop);
   state.nockBottom = shiftRel(state.nockBottom);
   if (state.stringDx !== null) {
-    const ax = oldX + state.stringDx;
-    state.stringDx = ax - newX;
+    state.stringDx = oldX + state.stringDx - newX;
   }
   state.anchorX = newX;
   state.anchorY = newY;
+  return true;
 }
 
 function applyClick(x, y) {
   const { dx, dy } = toRelative(x, y);
-
-  if (state.tool === 'anchor') {
-    pushHistory();
-    shiftAnchor(x, y);
-    return;
-  }
 
   if (state.tool === 'pin') {
     pushHistory();
@@ -238,18 +233,29 @@ function drawGrid() {
 
 function drawAnchor() {
   const { anchorX: ax, anchorY: ay } = state;
-  ctx.strokeStyle = 'rgba(255, 80, 100, 0.8)';
-  ctx.lineWidth = 1;
+  const active = state.tool === 'anchor';
+  const size = active ? 14 : 10;
+
+  if (active) {
+    ctx.strokeStyle = 'rgba(255, 200, 80, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(ax, ay, 16, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = active ? 'rgba(255, 120, 80, 1)' : 'rgba(255, 80, 100, 0.8)';
+  ctx.lineWidth = active ? 2 : 1;
   ctx.beginPath();
-  ctx.moveTo(ax - 10, ay);
-  ctx.lineTo(ax + 10, ay);
-  ctx.moveTo(ax, ay - 10);
-  ctx.lineTo(ax, ay + 10);
+  ctx.moveTo(ax - size, ay);
+  ctx.lineTo(ax + size, ay);
+  ctx.moveTo(ax, ay - size);
+  ctx.lineTo(ax, ay + size);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(255, 80, 100, 0.9)';
+  ctx.fillStyle = active ? 'rgba(255, 200, 80, 1)' : 'rgba(255, 80, 100, 0.9)';
   ctx.font = '8px monospace';
-  ctx.fillText('锚点(0,0)', ax + 6, ay - 6);
+  ctx.fillText(`锚点(0,0) [${ax},${ay}]`, ax + 8, ay - 8);
 }
 
 function drawParticles() {
@@ -398,6 +404,7 @@ function bindTools() {
       state.linePreview = null;
       document.querySelectorAll('.tool-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
+      canvas.style.cursor = state.tool === 'anchor' ? 'move' : 'crosshair';
       render();
     });
   });
@@ -457,6 +464,17 @@ function bindCanvas() {
     e.preventDefault();
     const pos = getCanvasPos(e);
 
+    if (state.tool === 'anchor') {
+      pushHistory();
+      state.anchorDragging = true;
+      isDrawing = true;
+      shiftAnchor(pos.x, pos.y);
+      render();
+      updateMeta();
+      generateExport();
+      return;
+    }
+
     if (state.tool === 'line') {
       state.lineStart = pos;
       state.linePreview = pos;
@@ -465,7 +483,7 @@ function bindCanvas() {
       return;
     }
 
-    if (['anchor', 'pin', 'nockTop', 'nockBottom', 'string'].includes(state.tool)) {
+    if (['pin', 'nockTop', 'nockBottom', 'string'].includes(state.tool)) {
       applyClick(pos.x, pos.y);
       render();
       updateMeta();
@@ -490,6 +508,14 @@ function bindCanvas() {
     if (!isDrawing) return;
     e.preventDefault();
     const pos = getCanvasPos(e);
+
+    if (state.tool === 'anchor' && state.anchorDragging) {
+      shiftAnchor(pos.x, pos.y);
+      render();
+      updateMeta();
+      generateExport();
+      return;
+    }
 
     if (state.tool === 'line') {
       state.linePreview = pos;
@@ -527,6 +553,7 @@ function bindCanvas() {
     }
 
     isDrawing = false;
+    state.anchorDragging = false;
     brushHistoryPushed = false;
   };
 
