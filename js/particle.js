@@ -5,48 +5,64 @@ export const MATERIALS = {
     colors: ['#6B3A1F', '#8B4513', '#A0522D', '#7A4A2E'],
     stiffness: 0.95,
     density: 1.0,
+    cohesion: 0.92,
+    granular: false,
   },
   STRING: {
     name: 'string',
     colors: ['#FFFFFF', '#F0F0F0', '#E8E8E8', '#D8D8D8'],
     stiffness: 0.3,
     density: 0.2,
+    cohesion: 0.2,
+    granular: false,
   },
   METAL: {
     name: 'metal',
     colors: ['#888888', '#AAAAAA', '#999999', '#BBBBBB'],
     stiffness: 0.99,
     density: 2.5,
+    cohesion: 0.98,
+    granular: false,
   },
   FEATHER: {
     name: 'feather',
     colors: ['#F5F5DC', '#FFF8DC', '#FAF0E6', '#FFFAF0'],
     stiffness: 0.1,
     density: 0.15,
+    cohesion: 0.15,
+    granular: false,
   },
   STRAW: {
     name: 'straw',
     colors: ['#C4A35A', '#D4B86A', '#B89B4A', '#DAA520'],
     stiffness: 0.4,
     density: 0.5,
+    cohesion: 0.12,
+    granular: true,
   },
   TARGET_WOOD: {
     name: 'target_wood',
     colors: ['#5C3A1E', '#6B4226', '#4A2C17', '#7A4F2E'],
     stiffness: 0.6,
     density: 0.8,
+    cohesion: 0.35,
+    granular: false,
   },
   TARGET_RED: {
     name: 'target_red',
     colors: ['#CC2222', '#DD3333', '#BB1111', '#EE4444'],
     stiffness: 0.5,
     density: 0.6,
+    cohesion: 0.2,
+    granular: true,
   },
   GROUND: {
     name: 'ground',
     colors: ['#3D6B2E', '#4A7C38', '#356025', '#528C3E'],
     stiffness: 1.0,
     density: 2.0,
+    cohesion: 1.0,
+    granular: false,
   },
 };
 
@@ -68,6 +84,8 @@ export class Particle {
     this.active = true;
     this.vx = 0;
     this.vy = 0;
+    this.restX = options.restX ?? null;
+    this.restY = options.restY ?? null;
   }
 
   pin(x, y) {

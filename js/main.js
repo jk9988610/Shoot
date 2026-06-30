@@ -208,6 +208,7 @@ class Game {
       r.drawAimGuide(sc.x, sc.y, aim.x, aim.y, 0.25);
     }
 
+    r.drawWoodBonds(this.bow.bodyConstraints);
     r.drawParticles(this.system.getActiveParticles());
   }
 

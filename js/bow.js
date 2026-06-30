@@ -24,6 +24,7 @@ export class Bow {
     this.isDrawing = false;
     this.drawAmount = 0;
     this.stringOffsetX = getBowData().stringOffsetX;
+    this.bodyConstraints = [];
 
     this._build();
   }
@@ -44,12 +45,16 @@ export class Bow {
     const map = new Map();
 
     for (const pt of data.particles) {
+      const px = cx + pt.dx;
+      const py = cy + pt.dy;
       const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -2 && pt.dx <= 0);
-      const p = this.system.addParticle(cx + pt.dx, cy + pt.dy, MATERIALS.WOOD, {
+      const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
         pinned,
         owner: 'bow',
         color: pt.color,
         radius: 1.2,
+        restX: px,
+        restY: py,
       });
       placed.push({ p, dx: pt.dx, dy: pt.dy });
       map.set(`${pt.dx},${pt.dy}`, p);
@@ -58,6 +63,7 @@ export class Bow {
     }
 
     this._linkAdjacentParticles(placed, map);
+    this._linkSpineParticles(placed, map);
 
     this.nockTop = map.get(`${data.nockTop.dx},${data.nockTop.dy}`)
       || this._createNock(cx + data.nockTop.dx, cy + data.nockTop.dy);
@@ -73,9 +79,21 @@ export class Bow {
       owner: 'bow',
       color: MATERIALS.WOOD.colors[0],
       radius: 1.2,
+      restX: x,
+      restY: y,
     });
     this.particles.push(p);
     return p;
+  }
+
+  _addBodyConstraint(p1, p2, options = {}) {
+    const c = this.system.addConstraint(p1, p2, {
+      stiffness: MATERIALS.WOOD.stiffness,
+      type: 'rigid',
+      ...options,
+    });
+    this.bodyConstraints.push(c);
+    return c;
   }
 
   _linkAdjacentParticles(placed, map) {
@@ -89,11 +107,33 @@ export class Bow {
       for (const [ox, oy] of offsets) {
         const neighbor = map.get(`${dx + ox},${dy + oy}`);
         if (!neighbor) continue;
-        const id = p.id < neighbor.id ? `${p.id}-${neighbor.id}` : `${neighbor.id}-${p.id}`;
+        const id = p.id < neighbor.p.id ? `${p.id}-${neighbor.p.id}` : `${neighbor.p.id}-${p.id}`;
         if (linked.has(id)) continue;
         linked.add(id);
-        this.system.addConstraint(p, neighbor, { stiffness: 0.85, type: 'rigid' });
+        this._addBodyConstraint(p, neighbor.p);
       }
+    }
+  }
+
+  /** 沿弓臂脊柱加强刚性连接，保持木质整体感 */
+  _linkSpineParticles(placed, map) {
+    const spineKeys = [
+      '0,-8', '0,-12', '-2,-16', '-4,-20', '-6,-24', '-8,-28', '-10,-32',
+      '-12,-36', '-14,-40', '-18,-44', '-22,-46', '-44,-48',
+    ];
+    const linked = new Set();
+    let current = map.get(spineKeys[0]);
+    if (!current) return;
+
+    for (let i = 1; i < spineKeys.length; i++) {
+      const next = map.get(spineKeys[i]);
+      if (!next) continue;
+      const id = current.id < next.id ? `${current.id}-${next.id}` : `${next.id}-${current.id}`;
+      if (!linked.has(id)) {
+        linked.add(id);
+        this._addBodyConstraint(current, next, { stiffness: 0.98 });
+      }
+      current = next;
     }
   }
 
