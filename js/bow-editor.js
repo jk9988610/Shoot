@@ -1,19 +1,22 @@
+import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
+
 const WOOD_COLORS = ['#6B3A1F', '#8B4513', '#A0522D', '#7A4A2E'];
 const GRID = 2;
 const CANVAS_W = 200;
 const CANVAS_H = 260;
-const ANCHOR_X = 100;
-const ANCHOR_Y = 220;
-const DISPLAY_SCALE = 2;
 
 const state = {
   tool: 'brush',
   color: WOOD_COLORS[1],
   showGrid: true,
+  anchorX: 100,
+  anchorY: 220,
   particles: new Map(),
   nockTop: null,
   nockBottom: null,
   stringDx: null,
+  lineStart: null,
+  linePreview: null,
   history: [],
 };
 
@@ -30,30 +33,42 @@ function snap(v) {
 }
 
 function toRelative(x, y) {
-  return { dx: x - ANCHOR_X, dy: y - ANCHOR_Y };
+  return { dx: x - state.anchorX, dy: y - state.anchorY };
 }
 
 function toAbsolute(dx, dy) {
-  return { x: ANCHOR_X + dx, y: ANCHOR_Y + dy };
+  return { x: state.anchorX + dx, y: state.anchorY + dy };
 }
 
-function pushHistory() {
-  state.history.push({
+function snapshot() {
+  return {
     particles: new Map(state.particles),
     nockTop: state.nockTop ? { ...state.nockTop } : null,
     nockBottom: state.nockBottom ? { ...state.nockBottom } : null,
     stringDx: state.stringDx,
-  });
+    anchorX: state.anchorX,
+    anchorY: state.anchorY,
+  };
+}
+
+function pushHistory() {
+  state.history.push(snapshot());
   if (state.history.length > 50) state.history.shift();
+}
+
+function restore(snap) {
+  state.particles = snap.particles;
+  state.nockTop = snap.nockTop;
+  state.nockBottom = snap.nockBottom;
+  state.stringDx = snap.stringDx;
+  state.anchorX = snap.anchorX;
+  state.anchorY = snap.anchorY;
 }
 
 function undo() {
   const prev = state.history.pop();
   if (!prev) return;
-  state.particles = prev.particles;
-  state.nockTop = prev.nockTop;
-  state.nockBottom = prev.nockBottom;
-  state.stringDx = prev.stringDx;
+  restore(prev);
   render();
   updateMeta();
   generateExport();
@@ -69,35 +84,83 @@ function getCanvasPos(e) {
   };
 }
 
-function applyTool(x, y) {
-  const { dx, dy } = toRelative(x, y);
+function placeParticle(dx, dy, options = {}) {
+  const k = key(dx, dy);
+  if (state.particles.has(k) && state.tool !== 'pin') return false;
+  state.particles.set(k, {
+    dx,
+    dy,
+    color: options.color ?? state.color,
+    pinned: options.pinned ?? false,
+  });
+  return true;
+}
 
-  if (state.tool === 'brush') {
-    const k = key(dx, dy);
-    if (!state.particles.has(k)) {
-      pushHistory();
-      state.particles.set(k, { dx, dy, color: state.color, pinned: false });
-    }
+function placeLine(x0, y0, x1, y1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const steps = Math.max(Math.abs(dx), Math.abs(dy)) / GRID;
+  if (steps === 0) {
+    const rel = toRelative(x0, y0);
+    placeParticle(rel.dx, rel.dy);
     return;
   }
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = snap(x0 + dx * t);
+    const y = snap(y0 + dy * t);
+    const rel = toRelative(x, y);
+    placeParticle(rel.dx, rel.dy);
+  }
+}
 
-  if (state.tool === 'eraser') {
-    const k = key(dx, dy);
-    if (state.particles.has(k)) {
-      pushHistory();
-      state.particles.delete(k);
-    }
+function shiftAnchor(newX, newY) {
+  const oldX = state.anchorX;
+  const oldY = state.anchorY;
+
+  const shiftRel = (pt) => {
+    if (!pt) return null;
+    const ax = oldX + pt.dx;
+    const ay = oldY + pt.dy;
+    return { dx: ax - newX, dy: ay - newY };
+  };
+
+  const next = new Map();
+  for (const p of state.particles.values()) {
+    const ax = oldX + p.dx;
+    const ay = oldY + p.dy;
+    const dx = ax - newX;
+    const dy = ay - newY;
+    next.set(key(dx, dy), { ...p, dx, dy });
+  }
+
+  state.particles = next;
+  state.nockTop = shiftRel(state.nockTop);
+  state.nockBottom = shiftRel(state.nockBottom);
+  if (state.stringDx !== null) {
+    const ax = oldX + state.stringDx;
+    state.stringDx = ax - newX;
+  }
+  state.anchorX = newX;
+  state.anchorY = newY;
+}
+
+function applyClick(x, y) {
+  const { dx, dy } = toRelative(x, y);
+
+  if (state.tool === 'anchor') {
+    pushHistory();
+    shiftAnchor(x, y);
     return;
   }
 
   if (state.tool === 'pin') {
-    const k = key(dx, dy);
     pushHistory();
+    const k = key(dx, dy);
     if (state.particles.has(k)) {
-      const p = state.particles.get(k);
-      p.pinned = !p.pinned;
+      state.particles.get(k).pinned = !state.particles.get(k).pinned;
     } else {
-      state.particles.set(k, { dx, dy, color: state.color, pinned: true });
+      placeParticle(dx, dy, { pinned: true });
     }
     return;
   }
@@ -118,6 +181,27 @@ function applyTool(x, y) {
     pushHistory();
     state.stringDx = dx;
   }
+}
+
+function applyBrush(x, y) {
+  const { dx, dy } = toRelative(x, y);
+  if (state.tool === 'brush') {
+    const k = key(dx, dy);
+    if (!state.particles.has(k)) {
+      placeParticle(dx, dy);
+      return true;
+    }
+    return false;
+  }
+  if (state.tool === 'eraser') {
+    const k = key(dx, dy);
+    if (state.particles.has(k)) {
+      state.particles.delete(k);
+      return true;
+    }
+    return false;
+  }
+  return false;
 }
 
 function drawBackground() {
@@ -153,18 +237,19 @@ function drawGrid() {
 }
 
 function drawAnchor() {
-  ctx.strokeStyle = 'rgba(255, 80, 100, 0.6)';
+  const { anchorX: ax, anchorY: ay } = state;
+  ctx.strokeStyle = 'rgba(255, 80, 100, 0.8)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(ANCHOR_X - 8, ANCHOR_Y);
-  ctx.lineTo(ANCHOR_X + 8, ANCHOR_Y);
-  ctx.moveTo(ANCHOR_X, ANCHOR_Y - 8);
-  ctx.lineTo(ANCHOR_X, ANCHOR_Y + 8);
+  ctx.moveTo(ax - 10, ay);
+  ctx.lineTo(ax + 10, ay);
+  ctx.moveTo(ax, ay - 10);
+  ctx.lineTo(ax, ay + 10);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(255, 80, 100, 0.7)';
+  ctx.fillStyle = 'rgba(255, 80, 100, 0.9)';
   ctx.font = '8px monospace';
-  ctx.fillText('锚点', ANCHOR_X + 6, ANCHOR_Y - 4);
+  ctx.fillText('锚点(0,0)', ax + 6, ay - 6);
 }
 
 function drawParticles() {
@@ -181,7 +266,7 @@ function drawParticles() {
 }
 
 function drawMarker(dx, dy, color, label) {
-  if (dx === null || dy === null) return;
+  if (dx === null || dy === undefined || dy === null) return;
   const { x, y } = toAbsolute(dx, dy);
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -194,9 +279,9 @@ function drawMarker(dx, dy, color, label) {
 
 function drawStringLine() {
   if (state.stringDx === null || !state.nockTop || !state.nockBottom) return;
-  const x = ANCHOR_X + state.stringDx;
-  const y1 = ANCHOR_Y + state.nockTop.dy;
-  const y2 = ANCHOR_Y + state.nockBottom.dy;
+  const x = state.anchorX + state.stringDx;
+  const y1 = state.anchorY + state.nockTop.dy;
+  const y2 = state.anchorY + state.nockBottom.dy;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.8)';
   ctx.lineWidth = 1;
@@ -208,10 +293,23 @@ function drawStringLine() {
   ctx.setLineDash([]);
 }
 
+function drawLinePreview() {
+  if (!state.lineStart || !state.linePreview) return;
+  ctx.strokeStyle = 'rgba(255, 200, 80, 0.7)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(state.lineStart.x, state.lineStart.y);
+  ctx.lineTo(state.linePreview.x, state.linePreview.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function render() {
   drawBackground();
   drawGrid();
   drawParticles();
+  drawLinePreview();
   drawStringLine();
   drawMarker(state.nockTop?.dx, state.nockTop?.dy, '#4ecca3', '上梢');
   drawMarker(state.nockBottom?.dx, state.nockBottom?.dy, '#4ecca3', '下梢');
@@ -223,13 +321,14 @@ function updateMeta() {
     ? `(${state.nockTop.dx}, ${state.nockTop.dy})` : '未设置';
   document.getElementById('info-nock-bottom').textContent = state.nockBottom
     ? `(${state.nockBottom.dx}, ${state.nockBottom.dy})` : '未设置';
-  document.getElementById('info-string').textContent = state.stringDx ?? '-16 (默认)';
+  document.getElementById('info-string').textContent = state.stringDx ?? '未设置';
   document.getElementById('info-count').textContent = state.particles.size;
-  document.getElementById('info-anchor').textContent = '(0, 0)';
+  document.getElementById('info-anchor').textContent =
+    `画布(${state.anchorX}, ${state.anchorY}) → 导出(0,0)`;
 }
 
 function computeStringOffsetX() {
-  if (state.stringDx === null) return -16;
+  if (state.stringDx === null) return 0;
   if (!state.nockTop) return state.stringDx;
   return state.stringDx - state.nockTop.dx;
 }
@@ -295,8 +394,11 @@ function bindTools() {
   document.querySelectorAll('.tool-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.tool = btn.dataset.tool;
+      state.lineStart = null;
+      state.linePreview = null;
       document.querySelectorAll('.tool-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
+      render();
     });
   });
 
@@ -348,29 +450,85 @@ function bindTools() {
 }
 
 let isDrawing = false;
+let brushHistoryPushed = false;
 
 function bindCanvas() {
   const start = (e) => {
     e.preventDefault();
-    isDrawing = true;
     const pos = getCanvasPos(e);
-    applyTool(pos.x, pos.y);
-    render();
-    updateMeta();
-    generateExport();
+
+    if (state.tool === 'line') {
+      state.lineStart = pos;
+      state.linePreview = pos;
+      isDrawing = true;
+      render();
+      return;
+    }
+
+    if (['anchor', 'pin', 'nockTop', 'nockBottom', 'string'].includes(state.tool)) {
+      applyClick(pos.x, pos.y);
+      render();
+      updateMeta();
+      generateExport();
+      return;
+    }
+
+    if (state.tool === 'brush' || state.tool === 'eraser') {
+      isDrawing = true;
+      brushHistoryPushed = false;
+      if (applyBrush(pos.x, pos.y)) {
+        pushHistory();
+        brushHistoryPushed = true;
+      }
+      render();
+      updateMeta();
+      generateExport();
+    }
   };
 
   const move = (e) => {
     if (!isDrawing) return;
     e.preventDefault();
     const pos = getCanvasPos(e);
-    applyTool(pos.x, pos.y);
-    render();
-    updateMeta();
-    generateExport();
+
+    if (state.tool === 'line') {
+      state.linePreview = pos;
+      render();
+      return;
+    }
+
+    if (state.tool === 'brush' || state.tool === 'eraser') {
+      if (applyBrush(pos.x, pos.y)) {
+        if (!brushHistoryPushed) {
+          pushHistory();
+          brushHistoryPushed = true;
+        }
+        render();
+        updateMeta();
+        generateExport();
+      }
+    }
   };
 
-  const end = () => { isDrawing = false; };
+  const end = () => {
+    if (!isDrawing) return;
+
+    if (state.tool === 'line' && state.lineStart && state.linePreview) {
+      pushHistory();
+      placeLine(
+        state.lineStart.x, state.lineStart.y,
+        state.linePreview.x, state.linePreview.y
+      );
+      state.lineStart = null;
+      state.linePreview = null;
+      render();
+      updateMeta();
+      generateExport();
+    }
+
+    isDrawing = false;
+    brushHistoryPushed = false;
+  };
 
   canvas.addEventListener('mousedown', start);
   canvas.addEventListener('mousemove', move);
@@ -380,44 +538,20 @@ function bindCanvas() {
   window.addEventListener('touchend', end);
 }
 
-function loadTemplate() {
-  const template = [
-    { dx: -2, dy: 0, color: '#8B4513', pinned: true },
-    { dx: 0, dy: 0, color: '#6B3A1F', pinned: true },
-    { dx: 2, dy: 0, color: '#8B4513', pinned: true },
-    { dx: -4, dy: -4, color: '#A0522D' },
-    { dx: -2, dy: -6, color: '#8B4513' },
-    { dx: 0, dy: -8, color: '#7A4A2E' },
-    { dx: 2, dy: -6, color: '#8B4513' },
-    { dx: 4, dy: -4, color: '#A0522D' },
-    { dx: -6, dy: -12, color: '#8B4513' },
-    { dx: -4, dy: -16, color: '#A0522D' },
-    { dx: -2, dy: -20, color: '#8B4513' },
-    { dx: 0, dy: -24, color: '#6B3A1F' },
-    { dx: 2, dy: -28, color: '#8B4513' },
-    { dx: 4, dy: -32, color: '#A0522D' },
-    { dx: 8, dy: -40, color: '#8B4513' },
-    { dx: 12, dy: -52, color: '#7A4A2E' },
-    { dx: 18, dy: -64, color: '#8B4513' },
-    { dx: 24, dy: -76, color: '#A0522D' },
-    { dx: 28, dy: -88, color: '#8B4513' },
-    { dx: 2, dy: 4, color: '#8B4513' },
-    { dx: 4, dy: 8, color: '#A0522D' },
-    { dx: 8, dy: 14, color: '#8B4513' },
-    { dx: 14, dy: 22, color: '#7A4A2E' },
-    { dx: 20, dy: 30, color: '#8B4513' },
-    { dx: 24, dy: 36, color: '#A0522D' },
-  ];
-  template.forEach((p) => state.particles.set(key(p.dx, p.dy), { ...p }));
-  state.nockTop = { dx: 28, dy: -88 };
-  state.nockBottom = { dx: 24, dy: 36 };
-  state.stringDx = 12;
+function loadFromGameData() {
+  const data = CUSTOM_BOW_DATA;
+  data.particles.forEach((p) => {
+    state.particles.set(key(p.dx, p.dy), { ...p });
+  });
+  state.nockTop = { ...data.nockTop };
+  state.nockBottom = { ...data.nockBottom };
+  state.stringDx = data.nockTop.dx + data.stringOffsetX;
 }
 
 initPalette();
 bindTools();
 bindCanvas();
-loadTemplate();
+loadFromGameData();
 render();
 updateMeta();
 generateExport();

@@ -21,6 +21,8 @@
       <div class="tool-group">
         <button type="button" class="tool-btn active" data-tool="brush" title="绘制木质粒子">🖌 画笔</button>
         <button type="button" class="tool-btn" data-tool="eraser" title="擦除粒子">⌫ 橡皮</button>
+        <button type="button" class="tool-btn" data-tool="line" title="直线绘制粒子">／ 直线</button>
+        <button type="button" class="tool-btn" data-tool="anchor" title="移动握把锚点">⊕ 锚点</button>
         <button type="button" class="tool-btn" data-tool="pin" title="标记固定点（握把）">📌 固定</button>
         <button type="button" class="tool-btn" data-tool="nockTop" title="上弓梢">▲ 上梢</button>
         <button type="button" class="tool-btn" data-tool="nockBottom" title="下弓梢">▼ 下梢</button>
@@ -50,7 +52,7 @@
       <div class="canvas-wrap">
         <canvas id="editor-canvas" width="200" height="260"></canvas>
         <div class="canvas-hint">
-          中心十字 = 握把锚点 (0,0) · 网格 2px · 侧视剖面（上为上梢方向）
+          红十字 = 握把锚点 (0,0)，用<strong>锚点</strong>工具点击可移动 · <strong>直线</strong>拖拽画线
         </div>
       </div>
     </section>
