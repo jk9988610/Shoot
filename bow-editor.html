@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>弓身绘制工具 — Particle Archery</title>
+  <link rel="stylesheet" href="css/bow-editor.css">
+</head>
+<body>
+  <header class="editor-header">
+    <div>
+      <h1>弓身绘制工具</h1>
+      <p>绘制弓身粒子剖面 → 导出代码 → 发给开发者集成到游戏</p>
+    </div>
+    <a href="index.html" class="back-link">← 返回游戏</a>
+  </header>
+
+  <main class="editor-main">
+    <section class="toolbar-panel">
+      <h2>工具</h2>
+      <div class="tool-group">
+        <button type="button" class="tool-btn active" data-tool="brush" title="绘制木质粒子">🖌 画笔</button>
+        <button type="button" class="tool-btn" data-tool="eraser" title="擦除粒子">⌫ 橡皮</button>
+        <button type="button" class="tool-btn" data-tool="pin" title="标记固定点（握把）">📌 固定</button>
+        <button type="button" class="tool-btn" data-tool="nockTop" title="上弓梢">▲ 上梢</button>
+        <button type="button" class="tool-btn" data-tool="nockBottom" title="下弓梢">▼ 下梢</button>
+        <button type="button" class="tool-btn" data-tool="string" title="弓弦 X 位置">│ 弦位</button>
+      </div>
+
+      <h2>木色</h2>
+      <div class="color-group" id="color-palette"></div>
+
+      <h2>操作</h2>
+      <div class="action-group">
+        <button type="button" id="btn-undo">撤销</button>
+        <button type="button" id="btn-clear">清空</button>
+        <button type="button" id="btn-grid">网格: 开</button>
+      </div>
+
+      <div class="meta-info" id="meta-info">
+        <div>上梢: <span id="info-nock-top">未设置</span></div>
+        <div>下梢: <span id="info-nock-bottom">未设置</span></div>
+        <div>弦位 X: <span id="info-string">-16</span></div>
+        <div>粒子数: <span id="info-count">0</span></div>
+        <div>握把锚点: <span id="info-anchor">(0, 0)</span></div>
+      </div>
+    </section>
+
+    <section class="canvas-panel">
+      <div class="canvas-wrap">
+        <canvas id="editor-canvas" width="200" height="260"></canvas>
+        <div class="canvas-hint">
+          中心十字 = 握把锚点 (0,0) · 网格 2px · 侧视剖面（上为上梢方向）
+        </div>
+      </div>
+    </section>
+
+    <section class="export-panel">
+      <div class="export-toolbar">
+        <h2>导出代码</h2>
+        <div class="export-actions">
+          <button type="button" id="btn-export">刷新代码</button>
+          <button type="button" id="btn-copy">复制</button>
+          <button type="button" id="btn-download">下载 .js</button>
+        </div>
+      </div>
+      <textarea id="export-code" readonly spellcheck="false"></textarea>
+      <p class="export-hint">
+        绘制完成后点击「复制」或「下载」，将代码发给我即可集成到 <code>bow.js</code>。
+        需设置<strong>上梢</strong>和<strong>下梢</strong>，建议用<strong>固定</strong>标记握把区域。
+      </p>
+    </section>
+  </main>
+
+  <script type="module" src="js/bow-editor.js"></script>
+</body>
+</html>
