@@ -6,7 +6,7 @@ import { Arrow } from './arrow.js';
 import { Target } from './target.js';
 import { InputHandler } from './input.js';
 import { VERSION, BUILD_LABEL } from './version.js';
-import { debug, debugGroup, logBoot } from './debug.js';
+import { debug, debugGroup, initDebugPanel, logBoot } from './debug.js';
 
 class Game {
   constructor() {
@@ -47,7 +47,6 @@ class Game {
   _logInit() {
     logBoot();
     debugGroup('初始化', () => {
-      debug('init', `版本 v${VERSION} (${BUILD_LABEL})`);
       debug('init', `画布 ${this.canvas.width}×${this.canvas.height}`);
       debug('init', `地面 Y=${this.physics.groundY}`);
       debug('init', `弓位置 x=${this.bow.x}, 弦心`, this.bow.getStringCenter());
@@ -222,5 +221,6 @@ class Game {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  initDebugPanel();
   new Game();
 });
