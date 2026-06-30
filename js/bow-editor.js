@@ -1,453 +1,339 @@
 import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
+import { GridModel } from './editor/grid-model.js';
+import { fromApplyData, generateExportCode, toApplyData } from './editor/apply.js';
+import { Viewport } from './editor/viewport.js';
+import { GridRenderer } from './editor/grid-renderer.js';
 
 const WOOD_COLORS = ['#6B3A1F', '#8B4513', '#A0522D', '#7A4A2E'];
-const GRID = 2;
-const CANVAS_W = 200;
-const CANVAS_H = 260;
 
-const state = {
-  tool: 'brush',
-  color: WOOD_COLORS[1],
-  showGrid: true,
-  anchorX: 100,
-  anchorY: 220,
-  particles: new Map(),
-  nockTop: null,
-  nockBottom: null,
-  stringDx: null,
-  lineStart: null,
-  linePreview: null,
-  anchorDragging: false,
-  history: [],
-};
-
+const model = fromApplyData(CUSTOM_BOW_DATA);
+const viewport = new Viewport();
 const canvas = document.getElementById('editor-canvas');
-const ctx = canvas.getContext('2d');
+const renderer = new GridRenderer(canvas);
 const exportCode = document.getElementById('export-code');
 
-function key(dx, dy) {
-  return `${dx},${dy}`;
-}
+const state = {
+  interactionMode: 'draw',
+  tool: 'brush',
+  color: WOOD_COLORS[1],
+  history: [],
+  lineStart: null,
+};
 
-function snap(v) {
-  return Math.round(v / GRID) * GRID;
-}
-
-function toRelative(x, y) {
-  return { dx: x - state.anchorX, dy: y - state.anchorY };
-}
-
-function toAbsolute(dx, dy) {
-  return { x: state.anchorX + dx, y: state.anchorY + dy };
-}
-
-function snapshot() {
-  return {
-    particles: new Map(state.particles),
-    nockTop: state.nockTop ? { ...state.nockTop } : null,
-    nockBottom: state.nockBottom ? { ...state.nockBottom } : null,
-    stringDx: state.stringDx,
-    anchorX: state.anchorX,
-    anchorY: state.anchorY,
-  };
-}
+let isPointerDown = false;
+let panStart = null;
+let pinchStart = null;
+let brushPushed = false;
 
 function pushHistory() {
-  state.history.push(snapshot());
+  state.history.push(model.snapshot());
   if (state.history.length > 50) state.history.shift();
 }
 
-function restore(snap) {
-  state.particles = snap.particles;
-  state.nockTop = snap.nockTop;
-  state.nockBottom = snap.nockBottom;
-  state.stringDx = snap.stringDx;
-  state.anchorX = snap.anchorX;
-  state.anchorY = snap.anchorY;
-}
-
 function undo() {
-  const prev = state.history.pop();
-  if (!prev) return;
-  restore(prev);
-  render();
-  updateMeta();
-  generateExport();
+  const snap = state.history.pop();
+  if (!snap) return;
+  model.restore(snap);
+  refresh();
 }
 
-function getCanvasPos(e) {
+function refresh() {
+  renderer.render(model, viewport, {
+    interactionMode: state.interactionMode,
+    tool: state.tool,
+    highlightAnchor: state.tool === 'anchor',
+  });
+  updateMeta();
+  exportCode.value = generateExportCode(model);
+}
+
+function updateMeta() {
+  const apply = toApplyData(model);
+  document.getElementById('info-mode').textContent =
+    state.interactionMode === 'pan' ? '拖动' : '绘制';
+  document.getElementById('info-tool').textContent = state.tool;
+  document.getElementById('info-zoom').textContent = `${Math.round(viewport.zoom * 100)}%`;
+  document.getElementById('info-nock-top').textContent = model.nockTop
+    ? `格(${model.nockTop.gx},${model.nockTop.gy})` : '未设置';
+  document.getElementById('info-nock-bottom').textContent = model.nockBottom
+    ? `格(${model.nockBottom.gx},${model.nockBottom.gy})` : '未设置';
+  document.getElementById('info-string').textContent = model.stringGx ?? '未设置';
+  document.getElementById('info-count').textContent = model.cells.size;
+  document.getElementById('info-anchor').textContent =
+    `格(${model.anchor.gx},${model.anchor.gy}) → 应用层(0,0)`;
+  document.getElementById('info-apply-count').textContent = apply.particles.length;
+}
+
+function getPos(e) {
   const rect = canvas.getBoundingClientRect();
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const t = e.touches ? e.touches[0] : e;
   return {
-    x: snap((clientX - rect.left) * (CANVAS_W / rect.width)),
-    y: snap((clientY - rect.top) * (CANVAS_H / rect.height)),
+    sx: (t.clientX - rect.left) * (canvas.width / rect.width),
+    sy: (t.clientY - rect.top) * (canvas.height / rect.height),
   };
 }
 
-function placeParticle(dx, dy, options = {}) {
-  const k = key(dx, dy);
-  if (state.particles.has(k) && state.tool !== 'pin') return false;
-  state.particles.set(k, {
-    dx,
-    dy,
-    color: options.color ?? state.color,
-    pinned: options.pinned ?? false,
-  });
-  return true;
+function getGrid(e) {
+  const { sx, sy } = getPos(e);
+  return { ...viewport.screenToGrid(sx, sy, canvas.width, canvas.height), sx, sy };
 }
 
-function placeLine(x0, y0, x1, y1) {
-  const dx = x1 - x0;
-  const dy = y1 - y0;
-  const steps = Math.max(Math.abs(dx), Math.abs(dy)) / GRID;
+function placeLine(gx0, gy0, gx1, gy1) {
+  const dx = gx1 - gx0;
+  const dy = gy1 - gy0;
+  const steps = Math.max(Math.abs(dx), Math.abs(dy));
   if (steps === 0) {
-    const rel = toRelative(x0, y0);
-    placeParticle(rel.dx, rel.dy);
+    model.setCell(gx0, gy0, { color: state.color, pinned: false });
     return;
   }
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    const x = snap(x0 + dx * t);
-    const y = snap(y0 + dy * t);
-    const rel = toRelative(x, y);
-    placeParticle(rel.dx, rel.dy);
+    const gx = Math.round(gx0 + dx * t);
+    const gy = Math.round(gy0 + dy * t);
+    model.setCell(gx, gy, { color: state.color, pinned: false });
   }
 }
 
-function shiftAnchor(newX, newY) {
-  const oldX = state.anchorX;
-  const oldY = state.anchorY;
-  if (oldX === newX && oldY === newY) return false;
-
-  const shiftRel = (pt) => {
-    if (!pt) return null;
-    return { dx: oldX + pt.dx - newX, dy: oldY + pt.dy - newY };
-  };
-
-  const next = new Map();
-  for (const p of state.particles.values()) {
-    const dx = oldX + p.dx - newX;
-    const dy = oldY + p.dy - newY;
-    const k = key(dx, dy);
-    if (!next.has(k)) {
-      next.set(k, { ...p, dx, dy });
-    }
-  }
-
-  state.particles = next;
-  state.nockTop = shiftRel(state.nockTop);
-  state.nockBottom = shiftRel(state.nockBottom);
-  if (state.stringDx !== null) {
-    state.stringDx = oldX + state.stringDx - newX;
-  }
-  state.anchorX = newX;
-  state.anchorY = newY;
-  return true;
-}
-
-function applyClick(x, y) {
-  const { dx, dy } = toRelative(x, y);
-
-  if (state.tool === 'pin') {
-    pushHistory();
-    const k = key(dx, dy);
-    if (state.particles.has(k)) {
-      state.particles.get(k).pinned = !state.particles.get(k).pinned;
-    } else {
-      placeParticle(dx, dy, { pinned: true });
-    }
-    return;
-  }
-
-  if (state.tool === 'nockTop') {
-    pushHistory();
-    state.nockTop = { dx, dy };
-    return;
-  }
-
-  if (state.tool === 'nockBottom') {
-    pushHistory();
-    state.nockBottom = { dx, dy };
-    return;
-  }
-
-  if (state.tool === 'string') {
-    pushHistory();
-    state.stringDx = dx;
-  }
-}
-
-function applyBrush(x, y) {
-  const { dx, dy } = toRelative(x, y);
+function applyDrawTool(gx, gy) {
   if (state.tool === 'brush') {
-    const k = key(dx, dy);
-    if (!state.particles.has(k)) {
-      placeParticle(dx, dy);
+    if (!model.getCell(gx, gy)) {
+      model.setCell(gx, gy, { color: state.color, pinned: false });
       return true;
     }
     return false;
   }
   if (state.tool === 'eraser') {
-    const k = key(dx, dy);
-    if (state.particles.has(k)) {
-      state.particles.delete(k);
+    if (model.getCell(gx, gy)) {
+      model.removeCell(gx, gy);
       return true;
     }
     return false;
   }
+  if (state.tool === 'anchor') {
+    return model.shiftAnchor(gx, gy);
+  }
+  if (state.tool === 'pin') {
+    model.togglePin(gx, gy, state.color);
+    return true;
+  }
+  if (state.tool === 'nockTop') {
+    model.nockTop = { gx, gy };
+    return true;
+  }
+  if (state.tool === 'nockBottom') {
+    model.nockBottom = { gx, gy };
+    return true;
+  }
+  if (state.tool === 'string') {
+    model.stringGx = gx;
+    return true;
+  }
   return false;
 }
 
-function drawBackground() {
-  const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
-  grad.addColorStop(0, '#5BA3D9');
-  grad.addColorStop(1, '#B8D4E8');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-  const groundY = CANVAS_H - 20;
-  ctx.fillStyle = '#3D6B2E';
-  ctx.fillRect(0, groundY, CANVAS_W, 20);
-  ctx.fillStyle = '#356025';
-  ctx.fillRect(0, groundY, CANVAS_W, 2);
-}
-
-function drawGrid() {
-  if (!state.showGrid) return;
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x <= CANVAS_W; x += GRID) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, CANVAS_H);
-    ctx.stroke();
-  }
-  for (let y = 0; y <= CANVAS_H; y += GRID) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(CANVAS_W, y);
-    ctx.stroke();
-  }
-}
-
-function drawAnchor() {
-  const { anchorX: ax, anchorY: ay } = state;
-  const active = state.tool === 'anchor';
-  const size = active ? 14 : 10;
-
-  if (active) {
-    ctx.strokeStyle = 'rgba(255, 200, 80, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(ax, ay, 16, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.strokeStyle = active ? 'rgba(255, 120, 80, 1)' : 'rgba(255, 80, 100, 0.8)';
-  ctx.lineWidth = active ? 2 : 1;
-  ctx.beginPath();
-  ctx.moveTo(ax - size, ay);
-  ctx.lineTo(ax + size, ay);
-  ctx.moveTo(ax, ay - size);
-  ctx.lineTo(ax, ay + size);
-  ctx.stroke();
-
-  ctx.fillStyle = active ? 'rgba(255, 200, 80, 1)' : 'rgba(255, 80, 100, 0.9)';
-  ctx.font = '8px monospace';
-  ctx.fillText(`锚点(0,0) [${ax},${ay}]`, ax + 8, ay - 8);
-}
-
-function drawParticles() {
-  for (const p of state.particles.values()) {
-    const { x, y } = toAbsolute(p.dx, p.dy);
-    ctx.fillStyle = p.color;
-    ctx.fillRect(x - 1, y - 1, GRID, GRID);
-    if (p.pinned) {
-      ctx.strokeStyle = '#ffd700';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x - 2, y - 2, GRID + 2, GRID + 2);
+function onPointerDown(e) {
+  if (state.interactionMode === 'pan') {
+    if (e.touches?.length === 2) {
+      const [a, b] = e.touches;
+      pinchStart = {
+        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        zoom: viewport.zoom,
+      };
+    } else {
+      const { sx, sy } = getPos(e);
+      panStart = { sx, sy, ox: viewport.offsetX, oy: viewport.offsetY };
     }
+    isPointerDown = true;
+    e.preventDefault();
+    return;
+  }
+
+  const { gx, gy } = getGrid(e);
+
+  if (state.tool === 'line') {
+    state.lineStart = { gx, gy };
+    isPointerDown = true;
+    e.preventDefault();
+    return;
+  }
+
+  if (['anchor', 'pin', 'nockTop', 'nockBottom', 'string'].includes(state.tool)) {
+    pushHistory();
+    applyDrawTool(gx, gy);
+    refresh();
+    e.preventDefault();
+    return;
+  }
+
+  if (state.tool === 'brush' || state.tool === 'eraser') {
+    isPointerDown = true;
+    brushPushed = false;
+    if (applyDrawTool(gx, gy)) {
+      pushHistory();
+      brushPushed = true;
+      refresh();
+    }
+    e.preventDefault();
   }
 }
 
-function drawMarker(dx, dy, color, label) {
-  if (dx === null || dy === undefined || dy === null) return;
-  const { x, y } = toAbsolute(dx, dy);
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = '8px monospace';
-  ctx.fillText(label, x + 6, y + 3);
+function onPointerMove(e) {
+  if (state.interactionMode === 'pan') {
+    if (e.touches?.length === 2 && pinchStart) {
+      const [a, b] = e.touches;
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const rect = canvas.getBoundingClientRect();
+      const cx = (a.clientX + b.clientX) / 2 - rect.left;
+      const cy = (a.clientY + b.clientY) / 2 - rect.top;
+      const factor = dist / pinchStart.dist;
+      viewport.zoom = Math.max(viewport.minZoom, Math.min(viewport.maxZoom, pinchStart.zoom * factor));
+      refresh();
+      e.preventDefault();
+      return;
+    }
+    if (panStart && (e.touches?.length === 1 || !e.touches)) {
+      const { sx, sy } = getPos(e);
+      viewport.offsetX = panStart.ox + (sx - panStart.sx);
+      viewport.offsetY = panStart.oy + (sy - panStart.sy);
+      refresh();
+      e.preventDefault();
+    }
+    return;
+  }
+
+  if (!isPointerDown) return;
+
+  if (state.tool === 'line' && state.lineStart) {
+    refresh();
+    const { gx, gy } = getGrid(e);
+    const ctx = canvas.getContext('2d');
+    const p0 = viewport.gridToScreen(state.lineStart.gx, state.lineStart.gy, canvas.width, canvas.height);
+    const p1 = viewport.gridToScreen(gx, gy, canvas.width, canvas.height);
+    ctx.strokeStyle = 'rgba(255,200,80,0.8)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    e.preventDefault();
+    return;
+  }
+
+  if (state.tool === 'brush' || state.tool === 'eraser') {
+    const { gx, gy } = getGrid(e);
+    if (applyDrawTool(gx, gy)) {
+      if (!brushPushed) {
+        pushHistory();
+        brushPushed = true;
+      }
+      refresh();
+    }
+    e.preventDefault();
+  }
 }
 
-function drawStringLine() {
-  if (state.stringDx === null || !state.nockTop || !state.nockBottom) return;
-  const x = state.anchorX + state.stringDx;
-  const y1 = state.anchorY + state.nockTop.dy;
-  const y2 = state.anchorY + state.nockBottom.dy;
+function onPointerUp(e) {
+  if (state.interactionMode === 'pan') {
+    panStart = null;
+    pinchStart = null;
+    isPointerDown = false;
+    return;
+  }
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([2, 2]);
-  ctx.beginPath();
-  ctx.moveTo(x, y1);
-  ctx.lineTo(x, y2);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  if (state.tool === 'line' && state.lineStart) {
+    const { gx, gy } = getGrid(e);
+    pushHistory();
+    placeLine(state.lineStart.gx, state.lineStart.gy, gx, gy);
+    state.lineStart = null;
+    refresh();
+  }
+
+  isPointerDown = false;
+  brushPushed = false;
 }
 
-function drawLinePreview() {
-  if (!state.lineStart || !state.linePreview) return;
-  ctx.strokeStyle = 'rgba(255, 200, 80, 0.7)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(state.lineStart.x, state.lineStart.y);
-  ctx.lineTo(state.linePreview.x, state.linePreview.y);
-  ctx.stroke();
-  ctx.setLineDash([]);
+function onWheel(e) {
+  if (state.interactionMode !== 'pan') return;
+  e.preventDefault();
+  const { sx, sy } = getPos(e);
+  viewport.zoomAt(e.deltaY < 0 ? 1.1 : 0.9, sx, sy, canvas.width, canvas.height);
+  refresh();
 }
 
-function render() {
-  drawBackground();
-  drawGrid();
-  drawParticles();
-  drawLinePreview();
-  drawStringLine();
-  drawMarker(state.nockTop?.dx, state.nockTop?.dy, '#4ecca3', '上梢');
-  drawMarker(state.nockBottom?.dx, state.nockBottom?.dy, '#4ecca3', '下梢');
-  drawAnchor();
-}
-
-function updateMeta() {
-  document.getElementById('info-nock-top').textContent = state.nockTop
-    ? `(${state.nockTop.dx}, ${state.nockTop.dy})` : '未设置';
-  document.getElementById('info-nock-bottom').textContent = state.nockBottom
-    ? `(${state.nockBottom.dx}, ${state.nockBottom.dy})` : '未设置';
-  document.getElementById('info-string').textContent = state.stringDx ?? '未设置';
-  document.getElementById('info-count').textContent = state.particles.size;
-  document.getElementById('info-anchor').textContent =
-    `画布(${state.anchorX}, ${state.anchorY}) → 导出(0,0)`;
-}
-
-function computeStringOffsetX() {
-  if (state.stringDx === null) return 0;
-  if (!state.nockTop) return state.stringDx;
-  return state.stringDx - state.nockTop.dx;
-}
-
-function generateExport() {
-  const particles = [...state.particles.values()].sort((a, b) => a.dy - b.dy || a.dx - b.dx);
-  const lines = particles.map((p) => {
-    const pin = p.pinned ? ', pinned: true' : '';
-    return `    { dx: ${p.dx}, dy: ${p.dy}, color: '${p.color}'${pin} },`;
-  });
-
-  const nockTopStr = state.nockTop
-    ? `{ dx: ${state.nockTop.dx}, dy: ${state.nockTop.dy} }`
-    : 'null /* 请设置上弓梢 */';
-  const nockBottomStr = state.nockBottom
-    ? `{ dx: ${state.nockBottom.dx}, dy: ${state.nockBottom.dy} }`
-    : 'null /* 请设置下弓梢 */';
-
-  const code = `/**
- * 自定义弓身数据
- * 由弓身绘制工具导出 — ${new Date().toISOString()}
- *
- * 用法：将此文件全部内容发给我，我会集成到 bow.js
- * 坐标说明：dx/dy 相对于握把锚点 (0,0)，dy 向上为负
- */
-export const CUSTOM_BOW_DATA = {
-  version: 1,
-  stringOffsetX: ${computeStringOffsetX()},
-  nockTop: ${nockTopStr},
-  nockBottom: ${nockBottomStr},
-  particles: [
-${lines.join('\n')}
-  ],
-};
-`;
-
-  exportCode.value = code;
-  return code;
+function setInteractionMode(mode) {
+  state.interactionMode = mode;
+  state.lineStart = null;
+  document.getElementById('btn-mode-draw').classList.toggle('active', mode === 'draw');
+  document.getElementById('btn-mode-pan').classList.toggle('active', mode === 'pan');
+  canvas.classList.toggle('mode-pan', mode === 'pan');
+  canvas.classList.toggle('mode-draw', mode === 'draw');
+  refresh();
 }
 
 function initPalette() {
   const palette = document.getElementById('color-palette');
   WOOD_COLORS.forEach((color, i) => {
-    const swatch = document.createElement('button');
-    swatch.type = 'button';
-    swatch.className = `color-swatch${i === 1 ? ' active' : ''}`;
-    swatch.style.background = color;
-    swatch.title = color;
-    swatch.addEventListener('click', () => {
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = `color-swatch${i === 1 ? ' active' : ''}`;
+    sw.style.background = color;
+    sw.addEventListener('click', () => {
       state.color = color;
       palette.querySelectorAll('.color-swatch').forEach((s) => s.classList.remove('active'));
-      swatch.classList.add('active');
+      sw.classList.add('active');
+      setInteractionMode('draw');
       state.tool = 'brush';
-      document.querySelectorAll('.tool-btn').forEach((b) => {
+      document.querySelectorAll('[data-tool]').forEach((b) => {
         b.classList.toggle('active', b.dataset.tool === 'brush');
       });
     });
-    palette.appendChild(swatch);
+    palette.appendChild(sw);
   });
 }
 
-function bindTools() {
-  document.querySelectorAll('.tool-btn').forEach((btn) => {
+function bindUI() {
+  document.getElementById('btn-mode-draw').addEventListener('click', () => setInteractionMode('draw'));
+  document.getElementById('btn-mode-pan').addEventListener('click', () => setInteractionMode('pan'));
+
+  document.querySelectorAll('[data-tool]').forEach((btn) => {
     btn.addEventListener('click', () => {
+      setInteractionMode('draw');
       state.tool = btn.dataset.tool;
-      state.lineStart = null;
-      state.linePreview = null;
-      document.querySelectorAll('.tool-btn').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('[data-tool]').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-      canvas.style.cursor = state.tool === 'anchor' ? 'move' : 'crosshair';
-      render();
+      refresh();
     });
   });
 
   document.getElementById('btn-undo').addEventListener('click', undo);
+  document.getElementById('btn-reset-view').addEventListener('click', () => {
+    viewport.reset();
+    refresh();
+  });
   document.getElementById('btn-clear').addEventListener('click', () => {
-    if (!confirm('确定清空全部绘制？')) return;
+    if (!confirm('清空全部网格？')) return;
     pushHistory();
-    state.particles.clear();
-    state.nockTop = null;
-    state.nockBottom = null;
-    state.stringDx = null;
-    render();
-    updateMeta();
-    generateExport();
-  });
-
-  document.getElementById('btn-grid').addEventListener('click', (e) => {
-    state.showGrid = !state.showGrid;
-    e.target.textContent = `网格: ${state.showGrid ? '开' : '关'}`;
-    render();
-  });
-
-  document.getElementById('btn-export').addEventListener('click', () => {
-    generateExport();
-    updateMeta();
+    model.cells.clear();
+    model.nockTop = null;
+    model.nockBottom = null;
+    model.stringGx = null;
+    refresh();
   });
 
   document.getElementById('btn-copy').addEventListener('click', async () => {
-    const code = generateExport();
+    const code = generateExportCode(model);
     try {
       await navigator.clipboard.writeText(code);
-      alert('代码已复制到剪贴板');
+      alert('应用层代码已复制');
     } catch {
       exportCode.select();
       document.execCommand('copy');
-      alert('代码已复制');
     }
   });
 
   document.getElementById('btn-download').addEventListener('click', () => {
-    const code = generateExport();
-    const blob = new Blob([code], { type: 'text/javascript' });
+    const blob = new Blob([generateExportCode(model)], { type: 'text/javascript' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'custom-bow-data.js';
@@ -456,129 +342,26 @@ function bindTools() {
   });
 }
 
-let isDrawing = false;
-let brushHistoryPushed = false;
-
 function bindCanvas() {
-  const start = (e) => {
-    e.preventDefault();
-    const pos = getCanvasPos(e);
-
-    if (state.tool === 'anchor') {
-      pushHistory();
-      state.anchorDragging = true;
-      isDrawing = true;
-      shiftAnchor(pos.x, pos.y);
-      render();
-      updateMeta();
-      generateExport();
-      return;
-    }
-
-    if (state.tool === 'line') {
-      state.lineStart = pos;
-      state.linePreview = pos;
-      isDrawing = true;
-      render();
-      return;
-    }
-
-    if (['pin', 'nockTop', 'nockBottom', 'string'].includes(state.tool)) {
-      applyClick(pos.x, pos.y);
-      render();
-      updateMeta();
-      generateExport();
-      return;
-    }
-
-    if (state.tool === 'brush' || state.tool === 'eraser') {
-      isDrawing = true;
-      brushHistoryPushed = false;
-      if (applyBrush(pos.x, pos.y)) {
-        pushHistory();
-        brushHistoryPushed = true;
-      }
-      render();
-      updateMeta();
-      generateExport();
-    }
-  };
-
-  const move = (e) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    const pos = getCanvasPos(e);
-
-    if (state.tool === 'anchor' && state.anchorDragging) {
-      shiftAnchor(pos.x, pos.y);
-      render();
-      updateMeta();
-      generateExport();
-      return;
-    }
-
-    if (state.tool === 'line') {
-      state.linePreview = pos;
-      render();
-      return;
-    }
-
-    if (state.tool === 'brush' || state.tool === 'eraser') {
-      if (applyBrush(pos.x, pos.y)) {
-        if (!brushHistoryPushed) {
-          pushHistory();
-          brushHistoryPushed = true;
-        }
-        render();
-        updateMeta();
-        generateExport();
-      }
-    }
-  };
-
-  const end = () => {
-    if (!isDrawing) return;
-
-    if (state.tool === 'line' && state.lineStart && state.linePreview) {
-      pushHistory();
-      placeLine(
-        state.lineStart.x, state.lineStart.y,
-        state.linePreview.x, state.linePreview.y
-      );
-      state.lineStart = null;
-      state.linePreview = null;
-      render();
-      updateMeta();
-      generateExport();
-    }
-
-    isDrawing = false;
-    state.anchorDragging = false;
-    brushHistoryPushed = false;
-  };
-
-  canvas.addEventListener('mousedown', start);
-  canvas.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', end);
-  canvas.addEventListener('touchstart', start, { passive: false });
-  canvas.addEventListener('touchmove', move, { passive: false });
-  window.addEventListener('touchend', end);
+  canvas.addEventListener('mousedown', onPointerDown);
+  canvas.addEventListener('mousemove', onPointerMove);
+  window.addEventListener('mouseup', onPointerUp);
+  canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+  canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+  window.addEventListener('touchend', onPointerUp);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
 }
 
-function loadFromGameData() {
-  const data = CUSTOM_BOW_DATA;
-  data.particles.forEach((p) => {
-    state.particles.set(key(p.dx, p.dy), { ...p });
-  });
-  state.nockTop = { ...data.nockTop };
-  state.nockBottom = { ...data.nockBottom };
-  state.stringDx = data.nockTop.dx + data.stringOffsetX;
+function resizeCanvas() {
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  refresh();
 }
 
 initPalette();
-bindTools();
+bindUI();
 bindCanvas();
-loadFromGameData();
-render();
-updateMeta();
-generateExport();
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+setInteractionMode('draw');

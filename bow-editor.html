@@ -2,31 +2,39 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>弓身绘制工具 — Particle Archery</title>
-  <link rel="stylesheet" href="css/bow-editor.css">
+  <link rel="stylesheet" href="css/bow-editor.css?v=0.4.0">
 </head>
 <body>
   <header class="editor-header">
     <div>
       <h1>弓身绘制工具</h1>
-      <p>绘制弓身粒子剖面 → 导出代码 → 发给开发者集成到游戏</p>
+      <p>绘制层(网格) → 应用层(游戏坐标) · 1格 = 1粒子 = 2px</p>
     </div>
     <a href="index.html" class="back-link">← 返回游戏</a>
   </header>
 
   <main class="editor-main">
     <section class="toolbar-panel">
-      <h2>工具</h2>
+      <h2>交互模式</h2>
+      <div class="mode-group">
+        <button type="button" id="btn-mode-draw" class="mode-btn active">✏ 绘制</button>
+        <button type="button" id="btn-mode-pan" class="mode-btn">✋ 拖动</button>
+      </div>
+      <p class="mode-hint">拖动：单指/鼠标平移，双指/滚轮缩放</p>
+
+      <h2>绘制工具</h2>
       <div class="tool-group">
-        <button type="button" class="tool-btn active" data-tool="brush" title="绘制木质粒子">🖌 画笔</button>
-        <button type="button" class="tool-btn" data-tool="eraser" title="擦除粒子">⌫ 橡皮</button>
-        <button type="button" class="tool-btn" data-tool="line" title="直线绘制粒子">／ 直线</button>
-        <button type="button" class="tool-btn" data-tool="anchor" title="移动握把锚点">⊕ 锚点</button>
-        <button type="button" class="tool-btn" data-tool="pin" title="标记固定点（握把）">📌 固定</button>
-        <button type="button" class="tool-btn" data-tool="nockTop" title="上弓梢">▲ 上梢</button>
-        <button type="button" class="tool-btn" data-tool="nockBottom" title="下弓梢">▼ 下梢</button>
-        <button type="button" class="tool-btn" data-tool="string" title="弓弦 X 位置">│ 弦位</button>
+        <button type="button" class="tool-btn active" data-tool="brush">画笔</button>
+        <button type="button" class="tool-btn" data-tool="eraser">橡皮</button>
+        <button type="button" class="tool-btn" data-tool="line">直线</button>
+        <button type="button" class="tool-btn" data-tool="anchor">锚点</button>
+        <button type="button" class="tool-btn" data-tool="pin">固定</button>
+        <button type="button" class="tool-btn" data-tool="nockTop">上梢</button>
+        <button type="button" class="tool-btn" data-tool="nockBottom">下梢</button>
+        <button type="button" class="tool-btn" data-tool="string">弦位</button>
       </div>
 
       <h2>木色</h2>
@@ -35,45 +43,46 @@
       <h2>操作</h2>
       <div class="action-group">
         <button type="button" id="btn-undo">撤销</button>
+        <button type="button" id="btn-reset-view">重置视图</button>
         <button type="button" id="btn-clear">清空</button>
-        <button type="button" id="btn-grid">网格: 开</button>
       </div>
 
-      <div class="meta-info" id="meta-info">
+      <div class="meta-info">
+        <div class="meta-section">绘制层</div>
+        <div>模式: <span id="info-mode">绘制</span> · 工具: <span id="info-tool">brush</span></div>
+        <div>缩放: <span id="info-zoom">100%</span> · 粒子: <span id="info-count">0</span>格</div>
+        <div>锚点: <span id="info-anchor">(0,0)</span></div>
         <div>上梢: <span id="info-nock-top">未设置</span></div>
         <div>下梢: <span id="info-nock-bottom">未设置</span></div>
-        <div>弦位 X: <span id="info-string">-16</span></div>
-        <div>粒子数: <span id="info-count">0</span></div>
-        <div>握把锚点: <span id="info-anchor">(0, 0)</span></div>
+        <div>弦位格X: <span id="info-string">未设置</span></div>
+        <div class="meta-section">应用层</div>
+        <div>导出粒子: <span id="info-apply-count">0</span> · 1格=2px</div>
       </div>
     </section>
 
     <section class="canvas-panel">
-      <div class="canvas-wrap">
-        <canvas id="editor-canvas" width="200" height="260"></canvas>
-        <div class="canvas-hint">
-          选中<strong>锚点</strong>后，在画布上<strong>点击或拖拽</strong>移动红十字（弓身不动，仅改原点）
-        </div>
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="editor-canvas"></canvas>
       </div>
     </section>
 
     <section class="export-panel">
       <div class="export-toolbar">
-        <h2>导出代码</h2>
+        <h2>应用层代码</h2>
         <div class="export-actions">
-          <button type="button" id="btn-export">刷新代码</button>
           <button type="button" id="btn-copy">复制</button>
-          <button type="button" id="btn-download">下载 .js</button>
+          <button type="button" id="btn-download">下载</button>
         </div>
       </div>
       <textarea id="export-code" readonly spellcheck="false"></textarea>
       <p class="export-hint">
-        绘制完成后点击「复制」或「下载」，将代码发给我即可集成到 <code>bow.js</code>。
-        需设置<strong>上梢</strong>和<strong>下梢</strong>，建议用<strong>固定</strong>标记握把区域。
+        <strong>绘制层</strong>：网格上设计弓身（表现）<br>
+        <strong>应用层</strong>：下方代码供游戏物理模拟使用<br>
+        复制后发给我，或替换 <code>js/custom-bow-data.js</code>
       </p>
     </section>
   </main>
 
-  <script type="module" src="js/bow-editor.js"></script>
+  <script type="module" src="js/bow-editor.js?v=0.4.0"></script>
 </body>
 </html>
