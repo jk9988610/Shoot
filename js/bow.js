@@ -1,8 +1,11 @@
 import { MATERIALS } from './particle.js';
 
 /**
- * 弓 — 由棕色木质粒子构成弓身，白色粒子构成弓弦
- * 固定握把于地面，弓臂呈弧形剖面排列
+ * 弓 — 横屏剖面视角
+ *
+ * 侧视可见木质弓臂截面：年轮状棕色粒子层沿弧向排列。
+ * 弓弦（白色粒子）位于弓腹侧（背向靶标、朝向射手）。
+ * 握把固定于地面。
  */
 export class Bow {
   constructor(system, x, groundY) {
@@ -16,105 +19,171 @@ export class Bow {
     this.nockTop = null;
     this.nockBottom = null;
     this.stringCenter = null;
-    this.maxDraw = 80;
+    this.maxDraw = 70;
     this.isDrawing = false;
     this.drawAmount = 0;
+    this.stringOffsetX = -16;
 
     this._build();
   }
 
-  _build() {
-    const cx = this.x;
-    const cy = this.groundY - 50;
-    const bowHeight = 100;
-    const bowWidth = 30;
+  _woodColor(layer, offset = 0) {
+    const colors = MATERIALS.WOOD.colors;
+    return colors[(layer + offset) % colors.length];
+  }
 
-    // 握把 — 加粗棕色粒子簇，固定于地面
-    for (let i = -3; i <= 3; i++) {
-      for (let j = 0; j < 4; j++) {
-        const p = this.system.addParticle(
-          cx + i * 2,
-          cy + j * 2,
-          MATERIALS.WOOD,
-          { pinned: j >= 2, owner: 'bow', radius: 1.5 }
-        );
+  /** 在法线方向铺设木质年轮截面粒子 */
+  _placeWoodGrain(cx, cy, nx, ny, layers, options = {}) {
+    const placed = [];
+    const half = (layers - 1) / 2;
+    for (let i = 0; i < layers; i++) {
+      const t = i - half;
+      const px = cx + nx * t * 2;
+      const py = cy + ny * t * 2;
+      const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
+        pinned: options.pinned || false,
+        owner: 'bow',
+        color: this._woodColor(i, options.colorOffset || 0),
+        radius: 1.2,
+      });
+      placed.push(p);
+      this.particles.push(p);
+
+      if (i > 0) {
+        this.system.addConstraint(placed[i - 1], p, {
+          stiffness: 0.92,
+          type: 'rigid',
+        });
+      }
+    }
+    return placed;
+  }
+
+  _sampleLimb(x0, y0, cx, cy, x1, y1, segments) {
+    const points = [];
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const mt = 1 - t;
+      const px = mt * mt * x0 + 2 * mt * t * cx + t * t * x1;
+      const py = mt * mt * y0 + 2 * mt * t * cy + t * t * y1;
+      points.push({ x: px, y: py, t });
+    }
+    return points;
+  }
+
+  _buildGrip(cx, cy) {
+    const w = 4;
+    const h = 9;
+    for (let row = 0; row < h; row++) {
+      const rowParticles = [];
+      for (let col = 0; col < w; col++) {
+        const px = cx - (w - 1) + col * 2;
+        const py = cy - (h - 1) * 1.5 + row * 3;
+        const pinned = row >= h - 2;
+        const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
+          pinned,
+          owner: 'bow',
+          color: this._woodColor(Math.min(col, row), row),
+          radius: 1.5,
+        });
+        rowParticles.push(p);
         this.gripParticles.push(p);
         this.particles.push(p);
       }
+      for (let col = 0; col < w - 1; col++) {
+        this.system.addConstraint(rowParticles[col], rowParticles[col + 1], {
+          stiffness: 0.98,
+          type: 'rigid',
+        });
+      }
     }
+  }
 
-    // 上弓臂 — 弧形棕色粒子
-    const upperCount = 18;
-    for (let i = 0; i < upperCount; i++) {
-      const t = i / (upperCount - 1);
-      const angle = -Math.PI / 2 - t * (Math.PI * 0.55);
-      const px = cx + Math.cos(angle) * bowWidth * (0.5 + t * 0.8);
-      const py = cy - Math.sin(angle) * bowHeight * 0.5 * (0.3 + t * 0.7);
+  _buildLimb(side, x0, y0, ctrlX, ctrlY, x1, y1) {
+    const segments = 16;
+    const layers = 5;
+    const points = this._sampleLimb(x0, y0, ctrlX, ctrlY, x1, y1, segments);
+    const limbList = [];
 
-      const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
-        pinned: i === 0,
-        owner: 'bow',
-        color: MATERIALS.WOOD.colors[i % MATERIALS.WOOD.colors.length],
+    for (let i = 0; i < points.length; i++) {
+      const pt = points[i];
+      let tx, ty;
+      if (i === 0) {
+        tx = points[1].x - pt.x;
+        ty = points[1].y - pt.y;
+      } else if (i === points.length - 1) {
+        tx = pt.x - points[i - 1].x;
+        ty = pt.y - points[i - 1].y;
+      } else {
+        tx = points[i + 1].x - points[i - 1].x;
+        ty = points[i + 1].y - points[i - 1].y;
+      }
+      const len = Math.hypot(tx, ty) || 1;
+      tx /= len;
+      ty /= len;
+      const nx = -ty;
+      const ny = tx;
+
+      const pinned = i === 0;
+      const grain = this._placeWoodGrain(pt.x, pt.y, nx, ny, layers, {
+        pinned,
+        colorOffset: i,
       });
-      this.limbParticles.upper.push(p);
-      this.particles.push(p);
+      const spine = grain[Math.floor(layers / 2)];
+      limbList.push(spine);
 
       if (i > 0) {
-        this.system.addConstraint(
-          this.limbParticles.upper[i - 1], p,
-          { stiffness: 0.9, type: 'rigid' }
-        );
-      }
-      if (i === 0) {
-        this.system.addConstraint(
-          this.gripParticles[3], p,
-          { stiffness: 0.95, type: 'rigid' }
-        );
+        this.system.addConstraint(limbList[i - 1], spine, {
+          stiffness: 0.9,
+          type: 'rigid',
+        });
       }
     }
 
-    // 下弓臂
-    const lowerCount = 18;
-    for (let i = 0; i < lowerCount; i++) {
-      const t = i / (lowerCount - 1);
-      const angle = Math.PI / 2 + t * (Math.PI * 0.55);
-      const px = cx + Math.cos(angle) * bowWidth * (0.5 + t * 0.8);
-      const py = cy - Math.sin(angle) * bowHeight * 0.5 * (0.3 + t * 0.7);
+    this.limbParticles[side] = limbList;
+    return limbList;
+  }
 
-      const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
-        pinned: i === 0,
-        owner: 'bow',
-        color: MATERIALS.WOOD.colors[i % MATERIALS.WOOD.colors.length],
-      });
-      this.limbParticles.lower.push(p);
-      this.particles.push(p);
+  _build() {
+    const cx = this.x;
+    const cy = this.groundY - 52;
 
-      if (i > 0) {
-        this.system.addConstraint(
-          this.limbParticles.lower[i - 1], p,
-          { stiffness: 0.9, type: 'rigid' }
-        );
-      }
-      if (i === 0) {
-        this.system.addConstraint(
-          this.gripParticles[9], p,
-          { stiffness: 0.95, type: 'rigid' }
-        );
-      }
+    this._buildGrip(cx, cy);
+
+    const gripTop = this.gripParticles[6];
+    const gripBot = this.gripParticles[this.gripParticles.length - 3];
+
+    const upperLimb = this._buildLimb(
+      'upper',
+      gripTop.x, gripTop.y - 2,
+      cx + 42, cy - 58,
+      cx + 30, cy - 108
+    );
+
+    const lowerLimb = this._buildLimb(
+      'lower',
+      gripBot.x, gripBot.y + 2,
+      cx + 38, cy + 22,
+      cx + 26, this.groundY - 8
+    );
+
+    this.nockTop = upperLimb[upperLimb.length - 1];
+    this.nockBottom = lowerLimb[lowerLimb.length - 1];
+
+    if (gripTop) {
+      this.system.addConstraint(gripTop, upperLimb[0], { stiffness: 0.96, type: 'rigid' });
+    }
+    if (gripBot) {
+      this.system.addConstraint(gripBot, lowerLimb[0], { stiffness: 0.96, type: 'rigid' });
     }
 
-    this.nockTop = this.limbParticles.upper[upperCount - 1];
-    this.nockBottom = this.limbParticles.lower[lowerCount - 1];
-
-    // 弓弦 — 白色粒子链
-    const stringCount = 12;
+    const stringX = this.nockTop.x + this.stringOffsetX;
+    const stringCount = 14;
     for (let i = 0; i <= stringCount; i++) {
       const t = i / stringCount;
-      const px = this.nockTop.x + (this.nockBottom.x - this.nockTop.x) * t;
       const py = this.nockTop.y + (this.nockBottom.y - this.nockTop.y) * t;
-
       const pinned = i === 0 || i === stringCount;
-      const p = this.system.addParticle(px, py, MATERIALS.STRING, {
+      const p = this.system.addParticle(stringX, py, MATERIALS.STRING, {
         pinned,
         owner: 'bow_string',
         color: MATERIALS.STRING.colors[i % MATERIALS.STRING.colors.length],
@@ -122,18 +191,21 @@ export class Bow {
       this.stringParticles.push(p);
 
       if (i > 0) {
-        this.system.addConstraint(
-          this.stringParticles[i - 1], p,
-          { stiffness: MATERIALS.STRING.stiffness, type: 'spring' }
-        );
+        this.system.addConstraint(this.stringParticles[i - 1], p, {
+          stiffness: MATERIALS.STRING.stiffness,
+          type: 'spring',
+        });
       }
     }
 
-    // 弦端锚定到弓梢
-    this.system.addConstraint(this.nockTop, this.stringParticles[0],
-      { stiffness: 0.8, type: 'spring' });
-    this.system.addConstraint(this.nockBottom, this.stringParticles[stringCount],
-      { stiffness: 0.8, type: 'spring' });
+    this.system.addConstraint(this.nockTop, this.stringParticles[0], {
+      stiffness: 0.85,
+      type: 'spring',
+    });
+    this.system.addConstraint(this.nockBottom, this.stringParticles[stringCount], {
+      stiffness: 0.85,
+      type: 'spring',
+    });
 
     this.stringCenter = this.stringParticles[Math.floor(stringCount / 2)];
     this.restCenterX = this.stringCenter.x;
@@ -162,8 +234,11 @@ export class Bow {
     const cy = this.restCenterY;
     let dx = targetX - cx;
     let dy = targetY - cy;
-    const dist = Math.hypot(dx, dy);
 
+    if (dx > 0) dx *= 0.15;
+    dy = Math.max(-15, Math.min(15, dy));
+
+    const dist = Math.hypot(dx, dy);
     if (dist > this.maxDraw) {
       dx = (dx / dist) * this.maxDraw;
       dy = (dy / dist) * this.maxDraw;
@@ -174,15 +249,18 @@ export class Bow {
     this.stringCenter.prevX = this.stringCenter.x;
     this.stringCenter.prevY = this.stringCenter.y;
 
-    // 传播到相邻弦粒子
     const centerIdx = Math.floor(this.stringParticles.length / 2);
+    const count = this.stringParticles.length - 1;
     for (let i = 0; i < this.stringParticles.length; i++) {
       const p = this.stringParticles[i];
       if (p.pinned) continue;
       const t = Math.abs(i - centerIdx) / centerIdx;
-      const falloff = 1 - t * 0.7;
-      p.x = p.prevX + dx * falloff * 0.3;
-      p.y = p.prevY + dy * falloff * 0.3;
+      const falloff = 1 - t * 0.65;
+      const baseY = this.nockTop.y + (this.nockBottom.y - this.nockTop.y) * (i / count);
+      p.x = cx + dx * falloff;
+      p.y = baseY + dy * falloff * 0.2;
+      p.prevX = p.x;
+      p.prevY = p.y;
     }
 
     this.isDrawing = true;
@@ -196,24 +274,29 @@ export class Bow {
     this.drawAmount = 0;
     return {
       tension,
-      vx: -draw.x * 0.15 * (0.5 + tension),
-      vy: -draw.y * 0.15 * (0.5 + tension),
+      vx: -draw.x * 0.18 * (0.5 + tension),
+      vy: -draw.y * 0.08 * (0.5 + tension),
     };
   }
 
   resetString() {
-    for (const p of this.stringParticles) {
+    const stringX = this.restCenterX;
+    for (let i = 0; i < this.stringParticles.length; i++) {
+      const p = this.stringParticles[i];
       if (p.pinned) continue;
-      const idx = this.stringParticles.indexOf(p);
-      const t = idx / (this.stringParticles.length - 1);
-      p.x = this.nockTop.x + (this.nockBottom.x - this.nockTop.x) * t;
+      const t = i / (this.stringParticles.length - 1);
+      p.x = stringX;
       p.y = this.nockTop.y + (this.nockBottom.y - this.nockTop.y) * t;
       p.prevX = p.x;
       p.prevY = p.y;
     }
+    this.stringCenter.x = stringX;
+    this.stringCenter.y = this.restCenterY;
+    this.stringCenter.prevX = stringX;
+    this.stringCenter.prevY = this.restCenterY;
   }
 
-  isNearString(mx, my, threshold = 20) {
+  isNearString(mx, my, threshold = 22) {
     const sc = this.stringCenter;
     return Math.hypot(mx - sc.x, my - sc.y) < threshold;
   }

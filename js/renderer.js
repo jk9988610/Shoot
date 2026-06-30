@@ -4,7 +4,6 @@ export class Renderer {
     this.ctx = canvas.getContext('2d');
     this.width = canvas.width;
     this.height = canvas.height;
-    this.scale = 1;
     this.pixelSize = 2;
     this.ctx.imageSmoothingEnabled = false;
   }
@@ -33,7 +32,14 @@ export class Renderer {
   }
 
   drawParticles(particles) {
-    for (const p of particles) {
+    const sorted = [...particles].sort((a, b) => {
+      const layerOrder = { target: 0, target_face: 1, bow: 2, bow_string: 3, arrow: 4 };
+      const la = layerOrder[a.owner] ?? 2;
+      const lb = layerOrder[b.owner] ?? 2;
+      return la - lb;
+    });
+
+    for (const p of sorted) {
       if (!p.active) continue;
       this.ctx.fillStyle = p.color;
       const size = this.pixelSize;
@@ -46,19 +52,39 @@ export class Renderer {
     }
   }
 
-  drawCrossSectionLine(x, groundY, height) {
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  drawCrossSectionMarker(x, groundY, label, side = 'right') {
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     this.ctx.lineWidth = 1;
-    this.ctx.setLineDash([4, 4]);
+    this.ctx.setLineDash([3, 5]);
     this.ctx.beginPath();
-    this.ctx.moveTo(x, 0);
+    this.ctx.moveTo(x, 8);
     this.ctx.lineTo(x, groundY);
     this.ctx.stroke();
     this.ctx.setLineDash([]);
 
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    this.ctx.font = '8px "Press Start 2P"';
-    this.ctx.fillText('剖面', x + 4, 16);
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    this.ctx.font = '7px "Press Start 2P"';
+    const tx = side === 'left' ? x - 52 : x + 4;
+    this.ctx.fillText(label, tx, 18);
+  }
+
+  drawTargetFacing(faceX, centerY, halfHeight) {
+    this.ctx.fillStyle = 'rgba(255, 200, 80, 0.5)';
+    this.ctx.font = '6px "Press Start 2P"';
+    this.ctx.fillText('←迎箭面', faceX - 4, centerY - halfHeight - 8);
+
+    this.ctx.strokeStyle = 'rgba(255, 200, 80, 0.25)';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(faceX - 14, centerY);
+    this.ctx.lineTo(faceX, centerY);
+    this.ctx.stroke();
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(faceX - 10, centerY - 4);
+    this.ctx.lineTo(faceX - 14, centerY);
+    this.ctx.lineTo(faceX - 10, centerY + 4);
+    this.ctx.stroke();
   }
 
   drawAimGuide(fromX, fromY, toX, toY, alpha = 0.3) {
@@ -76,9 +102,8 @@ export class Renderer {
     this.ctx.fillStyle = '#2a2a3e';
     for (let i = 0; i < 5; i++) {
       this.ctx.fillRect(x - 2 + i, y, 1, 4 + i);
-      this.ctx.fillRect(x - 2 + i, y, 1, 4 + i);
     }
     this.ctx.fillStyle = '#4a4a5e';
-    this.ctx.fillRect(x - 4, y + 4, 8, 3);
+    this.ctx.fillRect(x - 5, y + 3, 10, 3);
   }
 }

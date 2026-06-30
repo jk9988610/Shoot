@@ -47,10 +47,8 @@ class Game {
     if (this.state !== 'ready') return;
     this.state = 'drawing';
     const sc = this.bow.getStringCenter();
-    const angle = Math.atan2(
-      this.target.centerY - sc.y,
-      this.target.centerX - sc.x
-    );
+    const aim = this.target.getAimPoint();
+    const angle = Math.atan2(aim.y - sc.y, aim.x - sc.x);
     this.arrow.nockTo(sc.x, sc.y, angle);
   }
 
@@ -58,10 +56,8 @@ class Game {
     if (this.state !== 'drawing') return;
 
     const sc = this.bow.getStringCenter();
-    const angle = Math.atan2(
-      this.target.centerY - sc.y,
-      this.target.centerX - sc.x
-    );
+    const aim = this.target.getAimPoint();
+    const angle = Math.atan2(aim.y - sc.y, aim.x - sc.x);
     this.arrow.followNock(sc.x, sc.y, angle);
 
     const tension = this.bow.getTension();
@@ -73,10 +69,8 @@ class Game {
     if (this.state !== 'drawing') return;
 
     const sc = this.bow.getStringCenter();
-    const angle = Math.atan2(
-      this.target.centerY - sc.y,
-      this.target.centerX - sc.x
-    );
+    const aim = this.target.getAimPoint();
+    const angle = Math.atan2(aim.y - sc.y, aim.x - sc.x);
     const launch = this.bow.release();
 
     const speed = 8 + launch.tension * 18;
@@ -151,16 +145,16 @@ class Game {
     r.clear();
     r.drawGround(this.physics.groundY);
 
-    // 剖面参考线 — 弓和靶各一条
-    r.drawCrossSectionLine(this.bow.x, this.physics.groundY, this.canvas.height);
-    r.drawCrossSectionLine(this.target.centerX, this.physics.groundY, this.canvas.height);
+    r.drawCrossSectionMarker(this.bow.x, this.physics.groundY, '弓剖面', 'right');
+    r.drawCrossSectionMarker(this.target.faceX, this.physics.groundY, '靶剖面', 'right');
+    r.drawTargetFacing(this.target.faceX, this.target.centerY, this.target.halfHeight);
 
     r.drawBowAnchor(this.bow.x, this.physics.groundY);
 
-    // 拉弓时显示瞄准线
     if (this.state === 'drawing') {
       const sc = this.bow.getStringCenter();
-      r.drawAimGuide(sc.x, sc.y, this.target.centerX, this.target.centerY, 0.25);
+      const aim = this.target.getAimPoint();
+      r.drawAimGuide(sc.x, sc.y, aim.x, aim.y, 0.25);
     }
 
     r.drawParticles(this.system.getActiveParticles());
