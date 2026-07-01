@@ -59,10 +59,14 @@ export class Bow {
     const cy = this._bowAnchorY(data, cell);
     const placed = [];
     const map = new Map();
+    const occupied = new Set();
 
     for (const pt of data.particles) {
       const px = cx + pt.dx;
       const py = cy + pt.dy;
+      const key = `${pt.dx},${pt.dy}`;
+      if (occupied.has(key)) continue;
+      occupied.add(key);
       const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -cell * 2 && pt.dx <= cell * 2);
       const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
         pinned,
@@ -87,7 +91,7 @@ export class Bow {
     this.nockBottom = map.get(`${data.nockBottom.dx},${data.nockBottom.dy}`)
       || this._createNock(cx + data.nockBottom.dx, cy + data.nockBottom.dy, cell);
 
-    this._buildString(cx, cy, data, cell);
+    this._buildString(cx, cy, data, cell, occupied);
   }
 
   _createNock(x, y, cell) {
@@ -153,7 +157,7 @@ export class Bow {
     }
   }
 
-  _buildString(cx, cy, data, cell) {
+  _buildString(cx, cy, data, cell, occupied = new Set()) {
     const pts = data.stringParticles ?? [];
     if (pts.length === 0) {
       this._buildStringFallback(cell);
@@ -162,6 +166,9 @@ export class Bow {
 
     const sorted = [...pts].sort((a, b) => a.dy - b.dy);
     for (const pt of sorted) {
+      const key = `${pt.dx},${pt.dy}`;
+      if (occupied.has(key)) continue;
+      occupied.add(key);
       const px = cx + pt.dx;
       const py = cy + pt.dy;
       const pinned = !!pt.pinned;

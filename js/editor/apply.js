@@ -41,7 +41,7 @@ export function toApplyData(model) {
   }
 
   return {
-    version: 3,
+    version: 4,
     cellSize: CELL_SIZE,
     stringOffsetX,
     nockTop,
@@ -111,7 +111,7 @@ export function generateExportCode(model) {
  * 弓身 + 弓弦分色块导出
  */
 export const CUSTOM_BOW_DATA = {
-  version: 3,
+  version: 4,
   cellSize: ${CELL_SIZE},
   stringOffsetX: ${data.stringOffsetX},
   nockTop: ${nockTopStr},

@@ -16,15 +16,21 @@ export function pushBowToGame(data) {
   return payload;
 }
 
-/** 游戏读取弓身：优先本地推送，否则内置文件 */
+/** 游戏读取弓身：内置版本新于本地推送时丢弃过时缓存 */
 export function resolveBowData(builtin) {
   try {
     const raw = localStorage.getItem(BOW_KEY);
     if (!raw) return { data: builtin, source: 'builtin' };
     const parsed = JSON.parse(raw);
-    if (parsed?.data?.particles?.length) {
-      return { data: parsed.data, source: 'local', meta: parsed };
+    const local = parsed?.data;
+    if (!local?.particles?.length) return { data: builtin, source: 'builtin' };
+    const builtinVer = builtin.version ?? 0;
+    const localVer = local.version ?? 0;
+    if (localVer < builtinVer) {
+      clearBowOverride();
+      return { data: builtin, source: 'builtin', stale: true };
     }
+    return { data: local, source: 'local', meta: parsed };
   } catch { /* ignore */ }
   return { data: builtin, source: 'builtin' };
 }

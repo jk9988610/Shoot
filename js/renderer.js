@@ -56,21 +56,8 @@ export class Renderer {
     }
   }
 
-  /** 木质内聚键 — 弓身粒子间的粘性纤维视觉 */
-  drawWoodBonds(constraints) {
-    this.ctx.strokeStyle = 'rgba(45, 24, 12, 0.28)';
-    this.ctx.lineWidth = 1;
-    for (const c of constraints) {
-      if (!c.p1.active || !c.p2.active) continue;
-      if (c.p1.owner !== 'bow' || c.p2.owner !== 'bow') continue;
-      if ((c.p1.material?.cohesion ?? 0) < 0.5) continue;
-      if (c.restLength > (c.p1.cellSize ?? 4) * 1.6) continue;
-      this.ctx.beginPath();
-      this.ctx.moveTo(Math.floor(c.p1.x), Math.floor(c.p1.y));
-      this.ctx.lineTo(Math.floor(c.p2.x), Math.floor(c.p2.y));
-      this.ctx.stroke();
-    }
-  }
+  /** @deprecated 已弃用 — 统一格填充，不再叠绘纤维线 */
+  drawWoodBonds(_constraints) {}
 
   drawCrossSectionMarker(x, groundY, label, side = 'right') {
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';

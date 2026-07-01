@@ -51,6 +51,9 @@ class Game {
   _logInit() {
     logBoot();
     const bowSource = Bow.getDataSource();
+    if (bowSource.source === 'builtin' && bowSource.stale) {
+      clearPendingBowUpdate();
+    }
     if (bowSource.source === 'local') {
       clearPendingBowUpdate();
     }
@@ -207,7 +210,6 @@ class Game {
       r.drawAimGuide(sc.x, sc.y, aim.x, aim.y, 0.25);
     }
 
-    r.drawWoodBonds(this.bow.bodyConstraints);
     r.drawParticles(this.system.getActiveParticles());
   }
 
