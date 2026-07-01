@@ -91,6 +91,7 @@ class Game {
   }
 
   _bindUI() {
+    const displayVer = window.__APP_VERSION__ || VERSION;
     this.ui = {
       tension: document.getElementById('tension-value'),
       tensionBar: document.getElementById('tension-bar'),
@@ -100,7 +101,7 @@ class Game {
       version: document.getElementById('version-badge'),
     };
     if (this.ui.version) {
-      this.ui.version.textContent = `v${VERSION}`;
+      this.ui.version.textContent = `v${displayVer}`;
     }
   }
 

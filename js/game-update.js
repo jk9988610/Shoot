@@ -34,18 +34,18 @@ export async function runGameUpdate() {
     if (pending) {
       clearPendingBowUpdate();
       setStatus('应用编辑器弓身…', 'pending');
-      hardReload(VERSION);
+      await hardReload();
       return;
     }
 
     if (remoteVer && remoteVer !== VERSION) {
       setStatus(`正在更新到 v${remoteVer}…`, 'ok');
-      hardReload(remoteVer);
+      await hardReload(remoteVer);
       return;
     }
 
     setStatus('刷新缓存…', 'ok');
-    hardReload(VERSION);
+    await hardReload(remoteVer || VERSION);
   } catch {
     setStatus('更新失败，请重试', 'error');
     btn.disabled = false;
