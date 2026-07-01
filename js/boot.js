@@ -1,18 +1,19 @@
-import { parseVersionFromSource } from './version-parse.js';
+import { fetchLiveVersion } from './version-parse.js';
 
 /**
- * 解析启动版本：URL ?v= 优先，否则拉取 js/version.js（唯一权威来源）
+ * 解析启动版本 — 始终以线上 version.js 为准，URL ?v= 仅作同步目标（不锁定旧版）
  * @returns {Promise<string>}
  */
 export async function resolveBootVersion() {
-  const fromUrl = new URLSearchParams(location.search).get('v');
-  if (fromUrl) return fromUrl;
+  return fetchLiveVersion();
+}
 
-  const res = await fetch(`js/version.js?_=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`version.js HTTP ${res.status}`);
-  const version = parseVersionFromSource(await res.text());
-  if (!version) throw new Error('VERSION 未在 version.js 中找到');
-  return version;
+/** 将地址栏 ?v= 同步为当前线上版本，避免旧链接永久显示老版本 */
+export function syncUrlVersion(version) {
+  const url = new URL(location.href);
+  if (url.searchParams.get('v') === version) return;
+  url.searchParams.set('v', version);
+  history.replaceState(null, '', url.pathname + url.search + url.hash);
 }
 
 /**
@@ -25,9 +26,11 @@ export async function resolveBootVersion() {
  * @param {Array<{ id: string, href: (v: string, bust: number) => string }>} [opts.links]
  */
 export async function bootPage(opts) {
-  const params = new URLSearchParams(location.search);
   const v = await resolveBootVersion();
-  const bust = params.get('_') || Date.now();
+  syncUrlVersion(v);
+  window.__APP_VERSION__ = v;
+
+  const bust = Date.now();
 
   if (opts.title) document.title = opts.title(v);
   if (opts.cssId && opts.css) {

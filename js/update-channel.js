@@ -1,5 +1,5 @@
 import { VERSION } from './version.js';
-import { parseVersionFromSource } from './version-parse.js';
+import { fetchLiveVersion } from './version-parse.js';
 
 const BOW_KEY = 'particle_archery_bow_override';
 const PENDING_KEY = 'particle_archery_pending_bow';
@@ -52,22 +52,20 @@ export function clearBowOverride() {
 /** 拉取线上 version.js 解析版本号 */
 export async function fetchRemoteVersion() {
   try {
-    const res = await fetch(`js/version.js?_=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) return null;
-    const text = await res.text();
-    return parseVersionFromSource(text);
+    return await fetchLiveVersion();
   } catch {
     return null;
   }
 }
 
 /**
- * 强制加载指定版本 — 通过 URL ?v= 驱动 index.html 动态 import
- * @param {string} [targetVersion] 目标版本号，默认保持当前 VERSION
+ * 强制加载最新版本 — 始终拉取线上 version.js，再写入 URL ?v=
+ * @param {string} [targetVersion] 可选目标版本，默认取线上最新
  */
-export function hardReload(targetVersion = VERSION) {
+export async function hardReload(targetVersion) {
+  const remote = targetVersion || await fetchRemoteVersion() || VERSION;
   const url = new URL(location.href);
-  url.searchParams.set('v', targetVersion);
+  url.searchParams.set('v', remote);
   url.searchParams.set('_', String(Date.now()));
   location.replace(url.pathname + url.search + url.hash);
 }
