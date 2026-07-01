@@ -42,13 +42,10 @@ export class Renderer {
     for (const p of sorted) {
       if (!p.active) continue;
       this.ctx.fillStyle = p.color;
-      const size = this.pixelSize;
-      this.ctx.fillRect(
-        Math.floor(p.x) - size / 2,
-        Math.floor(p.y) - size / 2,
-        size,
-        size
-      );
+      const size = p.owner === 'bow' ? (p.cellSize ?? 4) : this.pixelSize;
+      const gx = Math.floor(p.x / size) * size;
+      const gy = Math.floor(p.y / size) * size;
+      this.ctx.fillRect(gx, gy, size, size);
     }
   }
 
@@ -60,7 +57,7 @@ export class Renderer {
       if (!c.p1.active || !c.p2.active) continue;
       if (c.p1.owner !== 'bow' || c.p2.owner !== 'bow') continue;
       if ((c.p1.material?.cohesion ?? 0) < 0.5) continue;
-      if (c.restLength > 3.1) continue;
+      if (c.restLength > (c.p1.cellSize ?? 4) * 1.6) continue;
       this.ctx.beginPath();
       this.ctx.moveTo(Math.floor(c.p1.x), Math.floor(c.p1.y));
       this.ctx.lineTo(Math.floor(c.p2.x), Math.floor(c.p2.y));

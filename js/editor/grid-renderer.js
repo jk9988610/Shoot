@@ -26,14 +26,12 @@ export class GridRenderer {
 
     for (const c of model.cells.values()) {
       const { x, y } = viewport.gridToScreen(c.gx, c.gy, W, H);
-      const pad = 1;
-      const size = cs - pad * 2;
       ctx.fillStyle = c.color;
-      ctx.fillRect(x - cs / 2 + pad, y - cs / 2 + pad, size, size);
+      ctx.fillRect(x - cs / 2, y - cs / 2, cs, cs);
       if (c.pinned) {
         ctx.strokeStyle = '#ffd700';
         ctx.lineWidth = 2;
-        ctx.strokeRect(x - cs / 2 + 1, y - cs / 2 + 1, size, size);
+        ctx.strokeRect(x - cs / 2, y - cs / 2, cs, cs);
       }
     }
 

@@ -3,7 +3,7 @@
  */
 import { GridModel } from './grid-model.js';
 
-export const CELL_SIZE = 2;
+export const CELL_SIZE = 4;
 
 /** 绘制网格 → 游戏粒子数据 */
 export function toApplyData(model) {
@@ -30,7 +30,8 @@ export function toApplyData(model) {
   }
 
   return {
-    version: 1,
+    version: 2,
+    cellSize: CELL_SIZE,
     stringOffsetX,
     nockTop,
     nockBottom,
@@ -40,28 +41,29 @@ export function toApplyData(model) {
 
 /** 游戏粒子数据 → 绘制网格 */
 export function fromApplyData(data) {
+  const cell = data.cellSize ?? CELL_SIZE;
   const model = new GridModel();
 
   for (const p of data.particles) {
-    const gx = Math.round(p.dx / CELL_SIZE);
-    const gy = Math.round(p.dy / CELL_SIZE);
+    const gx = Math.round(p.dx / cell);
+    const gy = Math.round(p.dy / cell);
     model.setCell(gx, gy, { color: p.color, pinned: !!p.pinned });
   }
 
   if (data.nockTop) {
     model.nockTop = {
-      gx: Math.round(data.nockTop.dx / CELL_SIZE),
-      gy: Math.round(data.nockTop.dy / CELL_SIZE),
+      gx: Math.round(data.nockTop.dx / cell),
+      gy: Math.round(data.nockTop.dy / cell),
     };
   }
   if (data.nockBottom) {
     model.nockBottom = {
-      gx: Math.round(data.nockBottom.dx / CELL_SIZE),
-      gy: Math.round(data.nockBottom.dy / CELL_SIZE),
+      gx: Math.round(data.nockBottom.dx / cell),
+      gy: Math.round(data.nockBottom.dy / cell),
     };
   }
   if (data.nockTop && data.stringOffsetX !== undefined) {
-    model.stringGx = model.nockTop.gx + Math.round(data.stringOffsetX / CELL_SIZE);
+    model.stringGx = model.nockTop.gx + Math.round(data.stringOffsetX / cell);
   }
 
   return model;
@@ -83,11 +85,12 @@ export function generateExportCode(model) {
 
   return `/**
  * 自定义弓身数据
- * 由弓身绘制工具导出 — ${new Date().toISOString()}
+ * 网格系统生成 · 1格=1粒子 · 实心色块 · ${CELL_SIZE}px/格
  * 绘制层(网格) → 应用层(游戏坐标)，1格 = ${CELL_SIZE}px
  */
 export const CUSTOM_BOW_DATA = {
-  version: 1,
+  version: 2,
+  cellSize: ${CELL_SIZE},
   stringOffsetX: ${data.stringOffsetX},
   nockTop: ${nockTopStr},
   nockBottom: ${nockBottomStr},

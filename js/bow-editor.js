@@ -1,6 +1,6 @@
 import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
 import { GridModel } from './editor/grid-model.js';
-import { fromApplyData, generateExportCode, toApplyData } from './editor/apply.js';
+import { fromApplyData, generateExportCode, toApplyData, CELL_SIZE } from './editor/apply.js';
 import { Viewport } from './editor/viewport.js';
 import { GridRenderer } from './editor/grid-renderer.js';
 import { pushBowToGame } from './update-channel.js';
@@ -64,6 +64,8 @@ function updateMeta() {
   document.getElementById('info-anchor').textContent =
     `格(${model.anchor.gx},${model.anchor.gy}) → 应用层(0,0)`;
   document.getElementById('info-apply-count').textContent = apply.particles.length;
+  const cellEl = document.getElementById('info-cell-size');
+  if (cellEl) cellEl.textContent = apply.cellSize ?? CELL_SIZE;
 }
 
 function getPos(e) {

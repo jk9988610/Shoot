@@ -86,6 +86,7 @@ export class Particle {
     this.vy = 0;
     this.restX = options.restX ?? null;
     this.restY = options.restY ?? null;
+    this.cellSize = options.cellSize ?? null;
   }
 
   pin(x, y) {

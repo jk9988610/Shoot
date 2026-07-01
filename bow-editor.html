@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>弓身绘制工具 — Particle Archery</title>
-  <link rel="stylesheet" href="css/bow-editor.css?v=0.4.4">
+  <link rel="stylesheet" href="css/bow-editor.css?v=0.4.5">
 </head>
 <body>
   <header class="editor-header">
     <div>
       <h1>弓身绘制工具</h1>
-      <p>绘制层(网格) → 应用层(游戏坐标) · 1格 = 1粒子 = 2px</p>
+      <p>绘制层(网格) → 应用层(游戏坐标) · 1格 = 1粒子 = 4px · 色块填满格子</p>
     </div>
     <a href="index.html" class="back-link">← 返回游戏</a>
   </header>
@@ -58,7 +58,7 @@
         <div>下梢: <span id="info-nock-bottom">未设置</span></div>
         <div>弦位格X: <span id="info-string">未设置</span></div>
         <div class="meta-section">应用层</div>
-        <div>导出粒子: <span id="info-apply-count">0</span> · 1格=2px</div>
+        <div>导出粒子: <span id="info-apply-count">0</span> · 1格=<span id="info-cell-size">4</span>px</div>
       </div>
     </section>
 
@@ -85,6 +85,6 @@
     </section>
   </main>
 
-  <script type="module" src="js/bow-editor.js?v=0.4.4"></script>
+  <script type="module" src="js/bow-editor.js?v=0.4.5"></script>
 </body>
 </html>

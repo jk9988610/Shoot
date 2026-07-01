@@ -1,9 +1,14 @@
 import { MATERIALS } from './particle.js';
 import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
 import { resolveBowData } from './update-channel.js';
+import { CELL_SIZE as DEFAULT_CELL_SIZE } from './editor/apply.js';
 
 function getBowData() {
   return resolveBowData(CUSTOM_BOW_DATA).data;
+}
+
+function getCellSize() {
+  return getBowData().cellSize ?? DEFAULT_CELL_SIZE;
 }
 
 /**
@@ -41,20 +46,22 @@ export class Bow {
     const cx = this.x;
     const cy = this.groundY - 52;
     const data = getBowData();
+    const cell = getCellSize();
     const placed = [];
     const map = new Map();
 
     for (const pt of data.particles) {
       const px = cx + pt.dx;
       const py = cy + pt.dy;
-      const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -2 && pt.dx <= 0);
+      const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -cell && pt.dx <= cell);
       const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
         pinned,
         owner: 'bow',
         color: pt.color,
-        radius: 1.2,
+        radius: cell / 2,
         restX: px,
         restY: py,
+        cellSize: cell,
       });
       placed.push({ p, dx: pt.dx, dy: pt.dy });
       map.set(`${pt.dx},${pt.dy}`, p);
@@ -62,8 +69,8 @@ export class Bow {
       if (pinned) this.gripParticles.push(p);
     }
 
-    this._linkAdjacentParticles(placed, map);
-    this._linkSpineParticles(placed, map);
+    this._linkAdjacentParticles(placed, map, cell);
+    this._linkSpineParticles(placed, cell);
 
     this.nockTop = map.get(`${data.nockTop.dx},${data.nockTop.dy}`)
       || this._createNock(cx + data.nockTop.dx, cy + data.nockTop.dy);
@@ -96,10 +103,10 @@ export class Bow {
     return c;
   }
 
-  _linkAdjacentParticles(placed, map) {
+  _linkAdjacentParticles(placed, map, cell) {
     const offsets = [
-      [2, 0], [-2, 0], [0, 2], [0, -2],
-      [2, 2], [-2, 2], [2, -2], [-2, -2],
+      [cell, 0], [-cell, 0], [0, cell], [0, -cell],
+      [cell, cell], [-cell, cell], [cell, -cell], [-cell, -cell],
     ];
     const linked = new Set();
 
@@ -115,25 +122,24 @@ export class Bow {
     }
   }
 
-  /** 沿弓臂脊柱加强刚性连接，保持木质整体感 */
-  _linkSpineParticles(placed, map) {
-    const spineKeys = [
-      '0,-8', '0,-12', '-2,-16', '-4,-20', '-6,-24', '-8,-28', '-10,-32',
-      '-12,-36', '-14,-40', '-18,-44', '-22,-46', '-44,-48',
-    ];
-    const linked = new Set();
-    let current = map.get(spineKeys[0]);
-    if (!current) return;
+  /** 沿弓臂脊柱加强刚性连接 */
+  _linkSpineParticles(placed, cell) {
+    const byDy = new Map();
+    for (const item of placed) {
+      if (item.dy >= -cell * 2) continue;
+      if (!byDy.has(item.dy)) byDy.set(item.dy, []);
+      byDy.get(item.dy).push(item);
+    }
 
-    for (let i = 1; i < spineKeys.length; i++) {
-      const next = map.get(spineKeys[i]);
-      if (!next) continue;
-      const id = current.id < next.id ? `${current.id}-${next.id}` : `${next.id}-${current.id}`;
-      if (!linked.has(id)) {
-        linked.add(id);
-        this._addBodyConstraint(current, next, { stiffness: 0.98 });
+    const dys = [...byDy.keys()].sort((a, b) => a - b);
+    let prev = null;
+    for (const dy of dys) {
+      const row = byDy.get(dy).sort((a, b) => a.dx - b.dx);
+      const spine = row.reduce((best, cur) => (cur.dx > best.dx ? cur : best));
+      if (prev) {
+        this._addBodyConstraint(prev.p, spine.p, { stiffness: 0.98 });
       }
-      current = next;
+      prev = spine;
     }
   }
 
