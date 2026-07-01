@@ -1,10 +1,10 @@
 import { MATERIALS } from './particle.js';
 import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
-import { resolveBowData } from './update-channel.js';
+import { getRuntimeBowData, getRuntimeBowSource } from './bow-resolve.js';
 import { CELL_SIZE as DEFAULT_CELL_SIZE } from './editor/apply.js';
 
 function getBowData() {
-  return resolveBowData(CUSTOM_BOW_DATA).data;
+  return getRuntimeBowData();
 }
 
 function getCellSize() {
@@ -36,7 +36,7 @@ export class Bow {
   }
 
   static getDataSource() {
-    return resolveBowData(CUSTOM_BOW_DATA);
+    return getRuntimeBowSource();
   }
 
   _build() {

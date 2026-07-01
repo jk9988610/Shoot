@@ -43,10 +43,14 @@
       <h2>操作</h2>
       <div class="action-group">
         <button type="button" id="btn-push-game" class="btn-primary">⬆ 更新到游戏</button>
+        <button type="button" id="btn-cloud-toggle" class="btn-cloud" title="与 Card-World 共用 Supabase 云同步">☁ 云端关</button>
+        <button type="button" id="btn-cloud-load">拉取云端草稿</button>
+        <button type="button" id="btn-cloud-gallery">云端画廊</button>
         <button type="button" id="btn-undo">撤销</button>
         <button type="button" id="btn-reset-view">重置视图</button>
         <button type="button" id="btn-clear">清空</button>
       </div>
+      <p id="cloud-status" class="cloud-status">云同步关闭（仅本地草稿）</p>
       <p id="draft-status" class="draft-status">空白画布 · 绘制后自动保存草稿</p>
       <p id="push-status" class="push-status"></p>
 
