@@ -25,7 +25,7 @@ export class Bow {
     this.nockTop = null;
     this.nockBottom = null;
     this.stringCenter = null;
-    this.maxDraw = 100;
+    this.maxDraw = 120;
     this.isDrawing = false;
     this.drawAmount = 0;
     this.stringOffsetX = getBowData().stringOffsetX;

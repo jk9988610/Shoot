@@ -20,7 +20,8 @@ export class Renderer {
 
   _blockSizeFor(p) {
     if (p.cellSize) return p.cellSize;
-    if (p.owner === 'bow' || p.owner === 'bow_string' || p.owner === 'platform') {
+    if (p.owner === 'bow' || p.owner === 'bow_string' || p.owner === 'platform'
+      || p.owner === 'target' || p.owner === 'target_face') {
       return this.blockSize;
     }
     return this.pixelSize;

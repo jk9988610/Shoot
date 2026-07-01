@@ -23,7 +23,7 @@ class Game {
 
     this.platform = new Platform(this.system, groundY, this.canvas.width, { bowX });
     this.bow = new Bow(this.system, bowX, groundY);
-    this.target = new Target(this.system, 720, groundY);
+    this.target = new Target(this.system, 700, groundY);
 
     const sc = this.bow.getStringCenter();
     this.arrow = new Arrow(this.system, sc.x, sc.y);
