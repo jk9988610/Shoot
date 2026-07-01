@@ -27,6 +27,13 @@ let panStart = null;
 let pinchStart = null;
 let brushPushed = false;
 
+function ensureStrokeHistory() {
+  if (!brushPushed) {
+    pushHistory();
+    brushPushed = true;
+  }
+}
+
 function pushHistory() {
   state.history.push(model.snapshot());
   if (state.history.length > 50) state.history.shift();
@@ -60,7 +67,8 @@ function updateMeta() {
   document.getElementById('info-nock-bottom').textContent = model.nockBottom
     ? `格(${model.nockBottom.gx},${model.nockBottom.gy})` : '未设置';
   document.getElementById('info-string').textContent = model.stringGx ?? '未设置';
-  document.getElementById('info-count').textContent = model.cells.size;
+  document.getElementById('info-count').textContent =
+    `${[...model.cells.values()].filter((c) => c.kind !== 'string').length}格 · 弦${[...model.cells.values()].filter((c) => c.kind === 'string').length}格`;
   document.getElementById('info-anchor').textContent =
     `格(${model.anchor.gx},${model.anchor.gy}) → 应用层(0,0)`;
   document.getElementById('info-apply-count').textContent = apply.particles.length;
@@ -129,6 +137,7 @@ function applyDrawTool(gx, gy) {
     return true;
   }
   if (state.tool === 'string') {
+    model.setCell(gx, gy, { color: '#E8E8E8', pinned: false, kind: 'string' });
     model.stringGx = gx;
     return true;
   }
@@ -172,11 +181,9 @@ function onPointerDown(e) {
   if (state.tool === 'brush' || state.tool === 'eraser') {
     isPointerDown = true;
     brushPushed = false;
-    if (applyDrawTool(gx, gy)) {
-      pushHistory();
-      brushPushed = true;
-      refresh();
-    }
+    ensureStrokeHistory();
+    applyDrawTool(gx, gy);
+    refresh();
     e.preventDefault();
   }
 }
@@ -226,13 +233,9 @@ function onPointerMove(e) {
 
   if (state.tool === 'brush' || state.tool === 'eraser') {
     const { gx, gy } = getGrid(e);
-    if (applyDrawTool(gx, gy)) {
-      if (!brushPushed) {
-        pushHistory();
-        brushPushed = true;
-      }
-      refresh();
-    }
+    ensureStrokeHistory();
+    applyDrawTool(gx, gy);
+    refresh();
     e.preventDefault();
   }
 }
@@ -358,12 +361,13 @@ function bindUI() {
     const payload = pushBowToGame(apply);
     exportCode.value = generateExportCode(model);
     const status = document.getElementById('push-status');
+    const total = apply.particles.length + (apply.stringParticles?.length ?? 0);
     if (status) {
-      status.textContent = `已推送 ${payload.particleCount} 粒子 → 游戏待更新`;
+      status.textContent = `已推送 弓身${apply.particles.length}+弦${apply.stringParticles?.length ?? 0}=${total}格 → 游戏待更新`;
       status.className = 'push-status ok';
     }
     const open = confirm(
-      `弓身已推送到游戏（${payload.particleCount} 粒子）。\n\n确定：打开游戏并自动更新\n取消：稍后手动在游戏页点「更新」`
+      `弓身已推送到游戏（弓身 ${apply.particles.length} + 弦 ${apply.stringParticles?.length ?? 0} 格）。\n\n确定：打开游戏并自动更新\n取消：稍后手动在游戏页点「更新」`
     );
     if (open) {
       const url = new URL('index.html', location.href);

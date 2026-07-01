@@ -5,17 +5,26 @@ import { GridModel } from './grid-model.js';
 
 export const CELL_SIZE = 4;
 
+function cellToParticle(c, anchor) {
+  return {
+    dx: (c.gx - anchor.gx) * CELL_SIZE,
+    dy: (c.gy - anchor.gy) * CELL_SIZE,
+    color: c.color,
+    ...(c.pinned ? { pinned: true } : {}),
+  };
+}
+
 /** 绘制网格 → 游戏粒子数据 */
 export function toApplyData(model) {
   const { anchor } = model;
-  const particles = [...model.cells.values()]
-    .sort((a, b) => a.gy - b.gy || a.gx - b.gx)
-    .map((c) => ({
-      dx: (c.gx - anchor.gx) * CELL_SIZE,
-      dy: (c.gy - anchor.gy) * CELL_SIZE,
-      color: c.color,
-      ...(c.pinned ? { pinned: true } : {}),
-    }));
+  const particles = [];
+  const stringParticles = [];
+
+  for (const c of [...model.cells.values()].sort((a, b) => a.gy - b.gy || a.gx - b.gx)) {
+    const pt = cellToParticle(c, anchor);
+    if (c.kind === 'string') stringParticles.push(pt);
+    else particles.push(pt);
+  }
 
   const nockTop = model.nockTop
     ? { dx: (model.nockTop.gx - anchor.gx) * CELL_SIZE, dy: (model.nockTop.gy - anchor.gy) * CELL_SIZE }
@@ -30,12 +39,13 @@ export function toApplyData(model) {
   }
 
   return {
-    version: 2,
+    version: 3,
     cellSize: CELL_SIZE,
     stringOffsetX,
     nockTop,
     nockBottom,
     particles,
+    stringParticles,
   };
 }
 
@@ -47,7 +57,13 @@ export function fromApplyData(data) {
   for (const p of data.particles) {
     const gx = Math.round(p.dx / cell);
     const gy = Math.round(p.dy / cell);
-    model.setCell(gx, gy, { color: p.color, pinned: !!p.pinned });
+    model.setCell(gx, gy, { color: p.color, pinned: !!p.pinned, kind: 'body' });
+  }
+
+  for (const p of data.stringParticles ?? []) {
+    const gx = Math.round(p.dx / cell);
+    const gy = Math.round(p.dy / cell);
+    model.setCell(gx, gy, { color: p.color, pinned: !!p.pinned, kind: 'string' });
   }
 
   if (data.nockTop) {
@@ -71,7 +87,11 @@ export function fromApplyData(data) {
 
 export function generateExportCode(model) {
   const data = toApplyData(model);
-  const lines = data.particles.map((p) => {
+  const bodyLines = data.particles.map((p) => {
+    const pin = p.pinned ? ', pinned: true' : '';
+    return `    { dx: ${p.dx}, dy: ${p.dy}, color: '${p.color}'${pin} },`;
+  });
+  const stringLines = data.stringParticles.map((p) => {
     const pin = p.pinned ? ', pinned: true' : '';
     return `    { dx: ${p.dx}, dy: ${p.dy}, color: '${p.color}'${pin} },`;
   });
@@ -85,17 +105,20 @@ export function generateExportCode(model) {
 
   return `/**
  * 自定义弓身数据
- * 网格系统生成 · 1格=1粒子 · 实心色块 · ${CELL_SIZE}px/格
- * 绘制层(网格) → 应用层(游戏坐标)，1格 = ${CELL_SIZE}px
+ * 网格系统 · 1格=1粒子 · 实心色块 · ${CELL_SIZE}px/格
+ * 弓身 + 弓弦分色块导出
  */
 export const CUSTOM_BOW_DATA = {
-  version: 2,
+  version: 3,
   cellSize: ${CELL_SIZE},
   stringOffsetX: ${data.stringOffsetX},
   nockTop: ${nockTopStr},
   nockBottom: ${nockBottomStr},
   particles: [
-${lines.join('\n')}
+${bodyLines.join('\n')}
+  ],
+  stringParticles: [
+${stringLines.join('\n')}
   ],
 };
 `;

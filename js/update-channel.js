@@ -9,7 +9,7 @@ export function pushBowToGame(data) {
     data,
     pushedAt: Date.now(),
     editorVersion: VERSION,
-    particleCount: data.particles?.length ?? 0,
+    particleCount: (data.particles?.length ?? 0) + (data.stringParticles?.length ?? 0),
   };
   localStorage.setItem(BOW_KEY, JSON.stringify(payload));
   localStorage.setItem(PENDING_KEY, '1');

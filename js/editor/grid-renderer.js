@@ -28,6 +28,11 @@ export class GridRenderer {
       const { x, y } = viewport.gridToScreen(c.gx, c.gy, W, H);
       ctx.fillStyle = c.color;
       ctx.fillRect(x - cs / 2, y - cs / 2, cs, cs);
+      if (c.kind === 'string') {
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x - cs / 2, y - cs / 2, cs, cs);
+      }
       if (c.pinned) {
         ctx.strokeStyle = '#ffd700';
         ctx.lineWidth = 2;

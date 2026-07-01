@@ -4,6 +4,7 @@ import { Renderer } from './renderer.js';
 import { Bow } from './bow.js';
 import { Arrow } from './arrow.js';
 import { Target } from './target.js';
+import { Platform } from './platform.js';
 import { InputHandler } from './input.js';
 import { VERSION, BUILD_LABEL } from './version.js';
 import { debug, debugGroup, initDebugPanel, initPageGuards, logBoot } from './debug.js';
@@ -18,8 +19,9 @@ class Game {
     this.system = new ParticleSystem();
 
     const groundY = this.physics.groundY;
-    const bowX = 180;
+    const bowX = 160;
 
+    this.platform = new Platform(this.system, groundY, this.canvas.width, { bowX });
     this.bow = new Bow(this.system, bowX, groundY);
     this.target = new Target(this.system, 720, groundY);
 
@@ -194,13 +196,10 @@ class Game {
   _render() {
     const r = this.renderer;
     r.clear();
-    r.drawGround(this.physics.groundY);
 
     r.drawCrossSectionMarker(this.bow.x, this.physics.groundY, '弓剖面', 'right');
     r.drawCrossSectionMarker(this.target.faceX, this.physics.groundY, '靶剖面', 'right');
     r.drawTargetFacing(this.target.faceX, this.target.centerY, this.target.halfHeight);
-
-    r.drawBowAnchor(this.bow.x, this.physics.groundY);
 
     if (this.state === 'drawing') {
       const sc = this.bow.getStringCenter();

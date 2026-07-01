@@ -20,7 +20,13 @@ export class GridModel {
   }
 
   setCell(gx, gy, data) {
-    this.cells.set(GridModel.key(gx, gy), { gx, gy, ...data });
+    this.cells.set(GridModel.key(gx, gy), {
+      gx,
+      gy,
+      kind: 'body',
+      pinned: false,
+      ...data,
+    });
   }
 
   removeCell(gx, gy) {
@@ -32,7 +38,7 @@ export class GridModel {
     if (c) {
       c.pinned = !c.pinned;
     } else {
-      this.setCell(gx, gy, { color, pinned: true });
+      this.setCell(gx, gy, { color, pinned: true, kind: 'body' });
     }
   }
 
@@ -58,8 +64,12 @@ export class GridModel {
   }
 
   snapshot() {
+    const cells = new Map();
+    for (const [k, c] of this.cells) {
+      cells.set(k, { ...c });
+    }
     return {
-      cells: new Map(this.cells),
+      cells,
       anchor: { ...this.anchor },
       nockTop: this.nockTop ? { ...this.nockTop } : null,
       nockBottom: this.nockBottom ? { ...this.nockBottom } : null,
@@ -68,10 +78,13 @@ export class GridModel {
   }
 
   restore(snap) {
-    this.cells = snap.cells;
-    this.anchor = snap.anchor;
-    this.nockTop = snap.nockTop;
-    this.nockBottom = snap.nockBottom;
+    this.cells = new Map();
+    for (const [k, c] of snap.cells) {
+      this.cells.set(k, { ...c });
+    }
+    this.anchor = { ...snap.anchor };
+    this.nockTop = snap.nockTop ? { ...snap.nockTop } : null;
+    this.nockBottom = snap.nockBottom ? { ...snap.nockBottom } : null;
     this.stringGx = snap.stringGx;
   }
 }

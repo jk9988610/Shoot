@@ -5,6 +5,7 @@ export class Renderer {
     this.width = canvas.width;
     this.height = canvas.height;
     this.pixelSize = 2;
+    this.blockSize = 4;
     this.ctx.imageSmoothingEnabled = false;
   }
 
@@ -17,23 +18,32 @@ export class Renderer {
     this.ctx.fillRect(0, 0, this.width, this.height);
   }
 
-  drawGround(groundY) {
-    this.ctx.fillStyle = '#3D6B2E';
-    this.ctx.fillRect(0, groundY, this.width, this.height - groundY);
-
-    this.ctx.fillStyle = '#4A7C38';
-    for (let x = 0; x < this.width; x += 4) {
-      const h = 2 + Math.sin(x * 0.1) * 1;
-      this.ctx.fillRect(x, groundY - h, 3, h);
+  _blockSizeFor(p) {
+    if (p.cellSize) return p.cellSize;
+    if (p.owner === 'bow' || p.owner === 'bow_string' || p.owner === 'platform') {
+      return this.blockSize;
     }
+    return this.pixelSize;
+  }
 
-    this.ctx.fillStyle = '#356025';
-    this.ctx.fillRect(0, groundY, this.width, 3);
+  drawBlockParticle(p) {
+    const size = this._blockSizeFor(p);
+    const gx = Math.floor(p.x / size) * size;
+    const gy = Math.floor(p.y / size) * size;
+    this.ctx.fillStyle = p.color;
+    this.ctx.fillRect(gx, gy, size, size);
   }
 
   drawParticles(particles) {
     const sorted = [...particles].sort((a, b) => {
-      const layerOrder = { target: 0, target_face: 1, bow: 2, bow_string: 3, arrow: 4 };
+      const layerOrder = {
+        platform: -1,
+        target: 0,
+        target_face: 1,
+        bow: 2,
+        bow_string: 3,
+        arrow: 4,
+      };
       const la = layerOrder[a.owner] ?? 2;
       const lb = layerOrder[b.owner] ?? 2;
       return la - lb;
@@ -41,11 +51,7 @@ export class Renderer {
 
     for (const p of sorted) {
       if (!p.active) continue;
-      this.ctx.fillStyle = p.color;
-      const size = p.owner === 'bow' ? (p.cellSize ?? 4) : this.pixelSize;
-      const gx = Math.floor(p.x / size) * size;
-      const gy = Math.floor(p.y / size) * size;
-      this.ctx.fillRect(gx, gy, size, size);
+      this.drawBlockParticle(p);
     }
   }
 
@@ -109,14 +115,5 @@ export class Renderer {
     this.ctx.lineTo(toX, toY);
     this.ctx.stroke();
     this.ctx.setLineDash([]);
-  }
-
-  drawBowAnchor(x, y) {
-    this.ctx.fillStyle = '#2a2a3e';
-    for (let i = 0; i < 5; i++) {
-      this.ctx.fillRect(x - 2 + i, y, 1, 4 + i);
-    }
-    this.ctx.fillStyle = '#4a4a5e';
-    this.ctx.fillRect(x - 5, y + 3, 10, 3);
   }
 }

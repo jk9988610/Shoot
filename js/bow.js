@@ -12,7 +12,7 @@ function getCellSize() {
 }
 
 /**
- * 弓 — 横屏剖面视角，支持自定义绘制数据
+ * 弓 — 横屏剖面视角，弓身/弓弦均为格对齐色块粒子
  */
 export class Bow {
   constructor(system, x, groundY) {
@@ -25,11 +25,12 @@ export class Bow {
     this.nockTop = null;
     this.nockBottom = null;
     this.stringCenter = null;
-    this.maxDraw = 70;
+    this.maxDraw = 100;
     this.isDrawing = false;
     this.drawAmount = 0;
     this.stringOffsetX = getBowData().stringOffsetX;
     this.bodyConstraints = [];
+    this.stringConstraints = [];
 
     this._build();
   }
@@ -42,18 +43,27 @@ export class Bow {
     this._buildFromCustom();
   }
 
+  _bowAnchorY(data, cell) {
+    const extent = Math.max(
+      0,
+      ...data.particles.map((p) => Math.abs(p.dy)),
+      ...(data.stringParticles ?? []).map((p) => Math.abs(p.dy)),
+    );
+    return this.groundY - extent - cell * 2;
+  }
+
   _buildFromCustom() {
-    const cx = this.x;
-    const cy = this.groundY - 52;
     const data = getBowData();
     const cell = getCellSize();
+    const cx = this.x;
+    const cy = this._bowAnchorY(data, cell);
     const placed = [];
     const map = new Map();
 
     for (const pt of data.particles) {
       const px = cx + pt.dx;
       const py = cy + pt.dy;
-      const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -cell && pt.dx <= cell);
+      const pinned = !!pt.pinned || (pt.dy >= 0 && pt.dx >= -cell * 2 && pt.dx <= cell * 2);
       const p = this.system.addParticle(px, py, MATERIALS.WOOD, {
         pinned,
         owner: 'bow',
@@ -73,21 +83,22 @@ export class Bow {
     this._linkSpineParticles(placed, cell);
 
     this.nockTop = map.get(`${data.nockTop.dx},${data.nockTop.dy}`)
-      || this._createNock(cx + data.nockTop.dx, cy + data.nockTop.dy);
+      || this._createNock(cx + data.nockTop.dx, cy + data.nockTop.dy, cell);
     this.nockBottom = map.get(`${data.nockBottom.dx},${data.nockBottom.dy}`)
-      || this._createNock(cx + data.nockBottom.dx, cy + data.nockBottom.dy);
+      || this._createNock(cx + data.nockBottom.dx, cy + data.nockBottom.dy, cell);
 
-    this._buildString();
+    this._buildString(cx, cy, data, cell);
   }
 
-  _createNock(x, y) {
+  _createNock(x, y, cell) {
     const p = this.system.addParticle(x, y, MATERIALS.WOOD, {
       pinned: true,
       owner: 'bow',
       color: MATERIALS.WOOD.colors[0],
-      radius: 1.2,
+      radius: cell / 2,
       restX: x,
       restY: y,
+      cellSize: cell,
     });
     this.particles.push(p);
     return p;
@@ -114,15 +125,14 @@ export class Bow {
       for (const [ox, oy] of offsets) {
         const neighbor = map.get(`${dx + ox},${dy + oy}`);
         if (!neighbor) continue;
-        const id = p.id < neighbor.p.id ? `${p.id}-${neighbor.p.id}` : `${neighbor.p.id}-${p.id}`;
+        const id = p.id < neighbor.id ? `${p.id}-${neighbor.id}` : `${neighbor.id}-${p.id}`;
         if (linked.has(id)) continue;
         linked.add(id);
-        this._addBodyConstraint(p, neighbor.p);
+        this._addBodyConstraint(p, neighbor);
       }
     }
   }
 
-  /** 沿弓臂脊柱加强刚性连接 */
   _linkSpineParticles(placed, cell) {
     const byDy = new Map();
     for (const item of placed) {
@@ -143,21 +153,67 @@ export class Bow {
     }
   }
 
-  _buildString() {
-    const stringX = this.nockTop.x + this.stringOffsetX;
-    const stringCount = 14;
+  _buildString(cx, cy, data, cell) {
+    const pts = data.stringParticles ?? [];
+    if (pts.length === 0) {
+      this._buildStringFallback(cell);
+      return;
+    }
 
-    for (let i = 0; i <= stringCount; i++) {
-      const t = i / stringCount;
-      const py = this.nockTop.y + (this.nockBottom.y - this.nockTop.y) * t;
-      const pinned = i === 0 || i === stringCount;
+    const sorted = [...pts].sort((a, b) => a.dy - b.dy);
+    for (const pt of sorted) {
+      const px = cx + pt.dx;
+      const py = cy + pt.dy;
+      const pinned = !!pt.pinned;
+      const p = this.system.addParticle(px, py, MATERIALS.STRING, {
+        pinned,
+        owner: 'bow_string',
+        color: pt.color,
+        cellSize: cell,
+        restX: px,
+        restY: py,
+      });
+      this.stringParticles.push(p);
+    }
+
+    for (let i = 1; i < this.stringParticles.length; i++) {
+      const c = this.system.addConstraint(this.stringParticles[i - 1], this.stringParticles[i], {
+        stiffness: MATERIALS.STRING.stiffness,
+        type: 'spring',
+      });
+      this.stringConstraints.push(c);
+    }
+
+    this.system.addConstraint(this.nockTop, this.stringParticles[0], {
+      stiffness: 0.85,
+      type: 'spring',
+    });
+    this.system.addConstraint(
+      this.nockBottom,
+      this.stringParticles[this.stringParticles.length - 1],
+      { stiffness: 0.85, type: 'spring' },
+    );
+
+    this.stringCenter = this.stringParticles[Math.floor(this.stringParticles.length / 2)];
+    this.restCenterX = this.stringCenter.x;
+    this.restCenterY = this.stringCenter.y;
+  }
+
+  _buildStringFallback(cell) {
+    const stringX = this.nockTop.x + this.stringOffsetX;
+    const steps = Math.round((this.nockBottom.y - this.nockTop.y) / cell);
+    for (let i = 0; i <= steps; i++) {
+      const py = this.nockTop.y + i * cell;
+      const pinned = i === 0 || i === steps;
       const p = this.system.addParticle(stringX, py, MATERIALS.STRING, {
         pinned,
         owner: 'bow_string',
         color: MATERIALS.STRING.colors[i % MATERIALS.STRING.colors.length],
+        cellSize: cell,
+        restX: stringX,
+        restY: py,
       });
       this.stringParticles.push(p);
-
       if (i > 0) {
         this.system.addConstraint(this.stringParticles[i - 1], p, {
           stiffness: MATERIALS.STRING.stiffness,
@@ -165,17 +221,7 @@ export class Bow {
         });
       }
     }
-
-    this.system.addConstraint(this.nockTop, this.stringParticles[0], {
-      stiffness: 0.85,
-      type: 'spring',
-    });
-    this.system.addConstraint(this.nockBottom, this.stringParticles[stringCount], {
-      stiffness: 0.85,
-      type: 'spring',
-    });
-
-    this.stringCenter = this.stringParticles[Math.floor(stringCount / 2)];
+    this.stringCenter = this.stringParticles[Math.floor(this.stringParticles.length / 2)];
     this.restCenterX = this.stringCenter.x;
     this.restCenterY = this.stringCenter.y;
   }
@@ -204,7 +250,7 @@ export class Bow {
     let dy = targetY - cy;
 
     if (dx > 0) dx *= 0.15;
-    dy = Math.max(-15, Math.min(15, dy));
+    dy = Math.max(-20, Math.min(20, dy));
 
     const dist = Math.hypot(dx, dy);
     if (dist > this.maxDraw) {
@@ -248,23 +294,20 @@ export class Bow {
   }
 
   resetString() {
-    const stringX = this.restCenterX;
-    for (let i = 0; i < this.stringParticles.length; i++) {
-      const p = this.stringParticles[i];
+    for (const p of this.stringParticles) {
       if (p.pinned) continue;
-      const t = i / (this.stringParticles.length - 1);
-      p.x = stringX;
-      p.y = this.nockTop.y + (this.nockBottom.y - this.nockTop.y) * t;
-      p.prevX = p.x;
-      p.prevY = p.y;
+      p.x = p.restX;
+      p.y = p.restY;
+      p.prevX = p.restX;
+      p.prevY = p.restY;
     }
-    this.stringCenter.x = stringX;
+    this.stringCenter.x = this.restCenterX;
     this.stringCenter.y = this.restCenterY;
-    this.stringCenter.prevX = stringX;
+    this.stringCenter.prevX = this.restCenterX;
     this.stringCenter.prevY = this.restCenterY;
   }
 
-  isNearString(mx, my, threshold = 22) {
+  isNearString(mx, my, threshold = 32) {
     const sc = this.stringCenter;
     return Math.hypot(mx - sc.x, my - sc.y) < threshold;
   }
