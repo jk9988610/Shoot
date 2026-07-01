@@ -195,6 +195,25 @@ h2:first-child {
   min-height: 1.4em;
 }
 
+.draft-status {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 4px;
+  min-height: 1.4em;
+}
+
+.draft-status.saved {
+  color: #4ecca3;
+}
+
+.draft-status.restored {
+  color: #e9c46a;
+}
+
+.draft-status.error {
+  color: #e94560;
+}
+
 .push-status.ok {
   color: #4ecca3;
 }

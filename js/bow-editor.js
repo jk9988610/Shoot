@@ -1,19 +1,26 @@
-import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
 import { GridModel } from './editor/grid-model.js';
 import { fromApplyData, generateExportCode, toApplyData, CELL_SIZE } from './editor/apply.js';
 import { lineCells } from './editor/grid-line.js';
 import { Viewport } from './editor/viewport.js';
 import { GridRenderer } from './editor/grid-renderer.js';
+import {
+  formatDraftTime,
+  loadDraft,
+  saveDraft,
+} from './editor/draft-storage.js';
 import { pushBowToGame } from './update-channel.js';
 import { VERSION } from './version.js';
 
 const WOOD_COLORS = ['#6B3A1F', '#8B4513', '#A0522D', '#7A4A2E'];
 
-const model = fromApplyData(CUSTOM_BOW_DATA);
 const viewport = new Viewport();
 const canvas = document.getElementById('editor-canvas');
 const renderer = new GridRenderer(canvas);
 const exportCode = document.getElementById('export-code');
+const draftStatusEl = document.getElementById('draft-status');
+
+let model = new GridModel();
+let draftSaveTimer = null;
 
 const state = {
   interactionMode: 'draw',
@@ -45,10 +52,41 @@ function undo() {
   const snap = state.history.pop();
   if (!snap) return;
   model.restore(snap);
-  refresh();
+  refresh({ saveDraft: true });
 }
 
-function refresh() {
+function setDraftStatus(text, type = '') {
+  if (!draftStatusEl) return;
+  draftStatusEl.textContent = text;
+  draftStatusEl.className = `draft-status${type ? ` ${type}` : ''}`;
+}
+
+function persistDraftNow() {
+  const ok = saveDraft({
+    apply: toApplyData(model),
+    viewport: {
+      offsetX: viewport.offsetX,
+      offsetY: viewport.offsetY,
+      zoom: viewport.zoom,
+    },
+  });
+  if (ok) {
+    setDraftStatus(`草稿已保存 ${formatDraftTime(Date.now())}`, 'saved');
+  } else {
+    setDraftStatus('草稿保存失败（存储空间不足？）', 'error');
+  }
+}
+
+function scheduleDraftSave() {
+  if (draftSaveTimer) clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(() => {
+    draftSaveTimer = null;
+    persistDraftNow();
+  }, 600);
+}
+
+function refresh(options = {}) {
+  const { saveDraft = false } = options;
   renderer.render(model, viewport, {
     interactionMode: state.interactionMode,
     tool: state.tool,
@@ -57,6 +95,7 @@ function refresh() {
   });
   updateMeta();
   exportCode.value = generateExportCode(model);
+  if (saveDraft) scheduleDraftSave();
 }
 
 function updateMeta() {
@@ -170,7 +209,7 @@ function onPointerDown(e) {
   if (['anchor', 'pin', 'nockTop', 'nockBottom', 'string'].includes(state.tool)) {
     pushHistory();
     applyDrawTool(gx, gy);
-    refresh();
+    refresh({ saveDraft: true });
     e.preventDefault();
     return;
   }
@@ -180,7 +219,7 @@ function onPointerDown(e) {
     brushPushed = false;
     ensureStrokeHistory();
     applyDrawTool(gx, gy);
-    refresh();
+    refresh({ saveDraft: true });
     e.preventDefault();
   }
 }
@@ -223,7 +262,7 @@ function onPointerMove(e) {
     const { gx, gy } = getGrid(e);
     ensureStrokeHistory();
     applyDrawTool(gx, gy);
-    refresh();
+    refresh({ saveDraft: true });
     e.preventDefault();
   }
 }
@@ -233,6 +272,7 @@ function onPointerUp(e) {
     panStart = null;
     pinchStart = null;
     isPointerDown = false;
+    scheduleDraftSave();
     return;
   }
 
@@ -242,7 +282,11 @@ function onPointerUp(e) {
     placeLine(state.lineStart.gx, state.lineStart.gy, gx, gy);
     state.lineStart = null;
     state.linePreview = null;
-    refresh();
+    refresh({ saveDraft: true });
+  }
+
+  if (state.tool === 'brush' || state.tool === 'eraser') {
+    persistDraftNow();
   }
 
   isPointerDown = false;
@@ -255,6 +299,7 @@ function onWheel(e) {
   const { sx, sy } = getPos(e);
   viewport.zoomAt(e.deltaY < 0 ? 1.1 : 0.9, sx, sy, canvas.width, canvas.height);
   refresh();
+  scheduleDraftSave();
 }
 
 function setInteractionMode(mode) {
@@ -307,15 +352,17 @@ function bindUI() {
   document.getElementById('btn-reset-view').addEventListener('click', () => {
     viewport.reset();
     refresh();
+    scheduleDraftSave();
   });
   document.getElementById('btn-clear').addEventListener('click', () => {
-    if (!confirm('清空全部网格？')) return;
+    if (!confirm('清空全部网格？草稿也会被清空。')) return;
     pushHistory();
     model.cells.clear();
     model.nockTop = null;
     model.nockBottom = null;
     model.stringGx = null;
-    refresh();
+    refresh({ saveDraft: true });
+    persistDraftNow();
   });
 
   document.getElementById('btn-copy').addEventListener('click', async () => {
@@ -385,9 +432,40 @@ function resizeCanvas() {
   refresh();
 }
 
+function initFromDraftOrEmpty() {
+  const draft = loadDraft();
+  if (draft?.apply) {
+    model = fromApplyData(draft.apply);
+    if (draft.viewport) {
+      viewport.offsetX = draft.viewport.offsetX ?? 0;
+      viewport.offsetY = draft.viewport.offsetY ?? 0;
+      viewport.zoom = draft.viewport.zoom ?? 1;
+    }
+    setDraftStatus(`已恢复草稿（${formatDraftTime(draft.savedAt)}）`, 'restored');
+    return;
+  }
+  model = new GridModel();
+  setDraftStatus('空白画布 · 绘制后自动保存草稿');
+}
+
+function bindLifecycle() {
+  window.addEventListener('beforeunload', () => {
+    if (draftSaveTimer) {
+      clearTimeout(draftSaveTimer);
+      draftSaveTimer = null;
+    }
+    persistDraftNow();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') persistDraftNow();
+  });
+}
+
+initFromDraftOrEmpty();
 initPalette();
 bindUI();
 bindCanvas();
+bindLifecycle();
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 setInteractionMode('draw');
