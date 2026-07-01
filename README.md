@@ -54,3 +54,10 @@ python3 -m http.server 8080
 - Verlet 积分粒子物理
 - 弹簧/刚性约束系统
 - ES Modules，无构建依赖
+
+## 开发与部署
+
+本项目由 AI Agent 维护，采用全自动 CI/CD：
+
+- `cursor/*` 分支 PR → 自动校验合并 → 自动部署 GitHub Pages
+- 详见 [AGENTS.md](AGENTS.md)
