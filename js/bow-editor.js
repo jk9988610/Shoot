@@ -1,5 +1,6 @@
 import { GridModel } from './editor/grid-model.js';
 import { fromApplyData, generateExportCode, toApplyData, CELL_SIZE } from './editor/apply.js';
+import { gridToBowScene, bowSceneToGrid, exportBowSceneCode, validateBowScene } from './bow-scene.js';
 import { lineCells } from './editor/grid-line.js';
 import { Viewport } from './editor/viewport.js';
 import { GridRenderer } from './editor/grid-renderer.js';
@@ -9,6 +10,18 @@ import {
   saveDraft,
 } from './editor/draft-storage.js';
 import { pushBowToGame } from './update-channel.js';
+import { resolveEditorBowScene } from './bow-resolve.js';
+import {
+  publishBowToCloud,
+  saveBowDraftToCloud,
+  loadBowDraftFromCloud,
+  loadCloudSession,
+  saveCloudSession,
+  listPublishedBows,
+  downloadBowWork,
+} from './bow-cloud.js';
+import { isCloudOptIn, setCloudOptIn, shouldUseCloud } from './net-policy.js';
+import { isCloudEnabled } from './cloud-config.js';
 import { VERSION } from './version.js';
 
 const WOOD_COLORS = ['#6B3A1F', '#8B4513', '#A0522D', '#7A4A2E'];
@@ -21,6 +34,9 @@ const draftStatusEl = document.getElementById('draft-status');
 
 let model = new GridModel();
 let draftSaveTimer = null;
+let cloudSaveTimer = null;
+
+const cloudStatusEl = document.getElementById('cloud-status');
 
 const state = {
   interactionMode: 'draw',
@@ -61,20 +77,56 @@ function setDraftStatus(text, type = '') {
   draftStatusEl.className = `draft-status${type ? ` ${type}` : ''}`;
 }
 
+function setCloudStatus(text, type = '') {
+  if (!cloudStatusEl) return;
+  cloudStatusEl.textContent = text;
+  cloudStatusEl.className = `cloud-status${type ? ` ${type}` : ''}`;
+}
+
+function updateCloudToggleUi() {
+  const btn = document.getElementById('btn-cloud-toggle');
+  if (!btn) return;
+  const on = isCloudOptIn();
+  btn.textContent = on ? '☁ 云端开' : '☁ 云端关';
+  btn.classList.toggle('active', on);
+  setCloudStatus(on ? (isCloudEnabled() ? '云同步已开启' : '云端配置就绪') : '云同步关闭（仅本地草稿）', on ? 'on' : '');
+}
+
 function persistDraftNow() {
-  const ok = saveDraft({
-    apply: toApplyData(model),
-    viewport: {
-      offsetX: viewport.offsetX,
-      offsetY: viewport.offsetY,
-      zoom: viewport.zoom,
-    },
-  });
+  const scene = gridToBowScene(model);
+  const viewportData = {
+    offsetX: viewport.offsetX,
+    offsetY: viewport.offsetY,
+    zoom: viewport.zoom,
+  };
+  const ok = saveDraft({ apply: scene, viewport: viewportData });
   if (ok) {
     setDraftStatus(`草稿已保存 ${formatDraftTime(Date.now())}`, 'saved');
   } else {
     setDraftStatus('草稿保存失败（存储空间不足？）', 'error');
   }
+  scheduleCloudDraftSave();
+}
+
+function scheduleCloudDraftSave() {
+  if (!shouldUseCloud()) return;
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(async () => {
+    cloudSaveTimer = null;
+    try {
+      const scene = gridToBowScene(model);
+      await saveBowDraftToCloud(scene, {
+        viewport: {
+          offsetX: viewport.offsetX,
+          offsetY: viewport.offsetY,
+          zoom: viewport.zoom,
+        },
+      });
+      setCloudStatus(`云端草稿已同步 ${formatDraftTime(Date.now())}`, 'on');
+    } catch (e) {
+      setCloudStatus(`云端同步失败: ${e.message}`, 'error');
+    }
+  }, 1200);
 }
 
 function scheduleDraftSave() {
@@ -94,7 +146,7 @@ function refresh(options = {}) {
     linePreview: state.linePreview,
   });
   updateMeta();
-  exportCode.value = generateExportCode(model);
+  exportCode.value = exportBowSceneCode(model);
   if (saveDraft) scheduleDraftSave();
 }
 
@@ -385,26 +437,38 @@ function bindUI() {
     URL.revokeObjectURL(a.href);
   });
 
-  document.getElementById('btn-push-game').addEventListener('click', () => {
+  document.getElementById('btn-push-game').addEventListener('click', async () => {
+    const scene = gridToBowScene(model);
+    const check = validateBowScene(scene);
+    if (!check.ok) {
+      alert(check.reason);
+      return;
+    }
     const apply = toApplyData(model);
-    if (!apply.nockTop || !apply.nockBottom) {
-      alert('请先设置上梢和下梢');
-      return;
-    }
-    if (apply.particles.length === 0) {
-      alert('请至少绘制一个弓身粒子');
-      return;
-    }
-    const payload = pushBowToGame(apply);
-    exportCode.value = generateExportCode(model);
+    pushBowToGame(apply);
+    exportCode.value = exportBowSceneCode(model);
     const status = document.getElementById('push-status');
     const total = apply.particles.length + (apply.stringParticles?.length ?? 0);
     if (status) {
-      status.textContent = `已推送 弓身${apply.particles.length}+弦${apply.stringParticles?.length ?? 0}=${total}格 → 游戏待更新`;
+      status.textContent = `已推送本地 弓身${apply.particles.length}+弦${apply.stringParticles?.length ?? 0}=${total}格`;
       status.className = 'push-status ok';
     }
+
+    if (shouldUseCloud()) {
+      try {
+        const title = window.prompt('云端弓身标题', '我的弓') || '我的弓';
+        const pub = await publishBowToCloud(scene, { title });
+        if (status) {
+          status.textContent += ` · 已发布云端 (${pub.title})`;
+        }
+        setCloudStatus(`已发布云端 v${pub.id.slice(0, 8)}…`, 'on');
+      } catch (e) {
+        setCloudStatus(`云端发布失败: ${e.message}`, 'error');
+      }
+    }
+
     const open = confirm(
-      `弓身已推送到游戏（弓身 ${apply.particles.length} + 弦 ${apply.stringParticles?.length ?? 0} 格）。\n\n确定：打开游戏并自动更新\n取消：稍后手动在游戏页点「更新」`
+      `弓身已推送（弓身 ${apply.particles.length} + 弦 ${apply.stringParticles?.length ?? 0} 格）。\n\n确定：打开游戏\n取消：继续编辑`
     );
     if (open) {
       const url = new URL('index.html', location.href);
@@ -413,6 +477,63 @@ function bindUI() {
       location.href = url.toString();
     }
   });
+
+  document.getElementById('btn-cloud-toggle')?.addEventListener('click', () => {
+    setCloudOptIn(!isCloudOptIn());
+    updateCloudToggleUi();
+    if (isCloudOptIn()) scheduleCloudDraftSave();
+  });
+
+  document.getElementById('btn-cloud-load')?.addEventListener('click', async () => {
+    try {
+      const session = loadCloudSession();
+      const author = session?.authorLabel || await ensureAuthorFromPrompt();
+      if (!author) return;
+      saveCloudSession({ authorLabel: author });
+      const cloud = await loadBowDraftFromCloud(author);
+      if (!cloud?.bow) {
+        alert('云端没有该昵称的草稿');
+        return;
+      }
+      pushHistory();
+      model = bowSceneToGrid(cloud.bow);
+      if (cloud.viewport) {
+        viewport.offsetX = cloud.viewport.offsetX ?? 0;
+        viewport.offsetY = cloud.viewport.offsetY ?? 0;
+        viewport.zoom = cloud.viewport.zoom ?? 1;
+      }
+      refresh({ saveDraft: true });
+      setCloudStatus(`已从云端加载草稿`, 'on');
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+
+  document.getElementById('btn-cloud-gallery')?.addEventListener('click', async () => {
+    try {
+      const items = await listPublishedBows(20);
+      if (!items.length) {
+        alert('云端暂无已发布弓身');
+        return;
+      }
+      const lines = items.map((w, i) => `${i + 1}. ${w.title} — ${w.authorLabel} (${w.id.slice(0, 8)})`);
+      const pick = window.prompt(`选择弓身编号:\n${lines.join('\n')}`, '1');
+      const idx = Number(pick) - 1;
+      if (!Number.isFinite(idx) || idx < 0 || idx >= items.length) return;
+      const work = await downloadBowWork(items[idx].id);
+      pushHistory();
+      model = bowSceneToGrid(work.bow);
+      refresh({ saveDraft: true });
+      setCloudStatus(`已加载: ${work.title || items[idx].title}`, 'on');
+    } catch (e) {
+      alert(e.message);
+    }
+  });
+}
+
+async function ensureAuthorFromPrompt() {
+  const name = window.prompt('输入昵称', loadCloudSession()?.authorLabel || '');
+  return name?.trim() || null;
 }
 
 function bindCanvas() {
@@ -432,18 +553,26 @@ function resizeCanvas() {
   refresh();
 }
 
-function initFromDraftOrEmpty() {
-  const draft = loadDraft();
-  if (draft?.apply) {
-    model = fromApplyData(draft.apply);
-    if (draft.viewport) {
-      viewport.offsetX = draft.viewport.offsetX ?? 0;
-      viewport.offsetY = draft.viewport.offsetY ?? 0;
-      viewport.zoom = draft.viewport.zoom ?? 1;
+async function initFromDraftCloudOrEmpty() {
+  const localDraft = loadDraft();
+  const resolved = await resolveEditorBowScene({ localDraft });
+
+  if (resolved.scene) {
+    const check = validateBowScene(resolved.scene);
+    if (check.ok || resolved.source === 'cloud' || resolved.source === 'local') {
+      model = bowSceneToGrid(resolved.scene);
+      const vp = resolved.viewport ?? localDraft?.viewport;
+      if (vp) {
+        viewport.offsetX = vp.offsetX ?? 0;
+        viewport.offsetY = vp.offsetY ?? 0;
+        viewport.zoom = vp.zoom ?? 1;
+      }
+      const src = resolved.source === 'cloud' ? '云端' : '本地';
+      setDraftStatus(`已恢复${src}草稿`, 'restored');
+      return;
     }
-    setDraftStatus(`已恢复草稿（${formatDraftTime(draft.savedAt)}）`, 'restored');
-    return;
   }
+
   model = new GridModel();
   setDraftStatus('空白画布 · 绘制后自动保存草稿');
 }
@@ -461,11 +590,19 @@ function bindLifecycle() {
   });
 }
 
-initFromDraftOrEmpty();
-initPalette();
-bindUI();
-bindCanvas();
-bindLifecycle();
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
-setInteractionMode('draw');
+async function bootEditor() {
+  updateCloudToggleUi();
+  await initFromDraftCloudOrEmpty();
+  initPalette();
+  bindUI();
+  bindCanvas();
+  bindLifecycle();
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  setInteractionMode('draw');
+}
+
+bootEditor().catch((e) => {
+  console.error('[bow-editor]', e);
+  setDraftStatus('编辑器加载失败', 'error');
+});

@@ -80,6 +80,22 @@ body {
   color: #16213e;
 }
 
+#cloud-toggle-btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  padding: 8px 10px;
+  background: #16213e;
+  color: #888;
+  border: 2px solid #444;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+#cloud-toggle-btn.active {
+  border-color: #4ecca3;
+  color: #4ecca3;
+}
+
 #update-btn {
   font-family: 'Press Start 2P', monospace;
   font-size: 7px;

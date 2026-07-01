@@ -214,6 +214,35 @@ h2:first-child {
   color: #e94560;
 }
 
+.cloud-status {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 4px;
+  min-height: 1.4em;
+}
+
+.cloud-status.on {
+  color: #4ecca3;
+}
+
+.cloud-status.error {
+  color: #e94560;
+}
+
+.btn-cloud {
+  font-size: 10px;
+  padding: 6px 8px;
+  border: 1px solid #4ecca3;
+  background: transparent;
+  color: #4ecca3;
+  cursor: pointer;
+}
+
+.btn-cloud.active {
+  background: #4ecca3;
+  color: #1a1a2e;
+}
+
 .push-status.ok {
   color: #4ecca3;
 }

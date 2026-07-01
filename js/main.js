@@ -10,6 +10,25 @@ import { VERSION, BUILD_LABEL } from './version.js';
 import { debug, debugGroup, initDebugPanel, initPageGuards, logBoot } from './debug.js';
 import { initUpdateButton } from './game-update.js';
 import { clearPendingBowUpdate } from './update-channel.js';
+import { resolveBowForRuntime } from './bow-resolve.js';
+import { isCloudOptIn, setCloudOptIn } from './net-policy.js';
+
+function initCloudToggle() {
+  const btn = document.getElementById('cloud-toggle-btn');
+  if (!btn) return;
+  const sync = () => {
+    btn.textContent = isCloudOptIn() ? '☁开' : '☁关';
+    btn.classList.toggle('active', isCloudOptIn());
+  };
+  sync();
+  btn.addEventListener('click', () => {
+    setCloudOptIn(!isCloudOptIn());
+    sync();
+    if (isCloudOptIn()) {
+      location.reload();
+    }
+  });
+}
 
 class Game {
   constructor() {
@@ -230,9 +249,18 @@ class Game {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   initPageGuards();
   initDebugPanel();
   initUpdateButton();
-  new Game();
+  try {
+    await resolveBowForRuntime();
+    new Game();
+  } catch (e) {
+    console.error('[boot] game init failed', e);
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<p style="color:#e94560;padding:12px">游戏加载失败，请刷新重试</p>',
+    );
+  }
 });
