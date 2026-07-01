@@ -25,6 +25,8 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.head_ref, 'cursor/')
     runs-on: ubuntu-latest
+    outputs:
+      merged: ${{ steps.merge.outputs.merged }}
     steps:
       - name: Resolve PR number
         id: pr
@@ -61,6 +63,7 @@ jobs:
           echo "Validation passed."
 
       - name: Merge PR
+        id: merge
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,7 +72,44 @@ jobs:
           STATE=$(gh pr view "$PR" --json state -q .state)
           if [ "$STATE" != "OPEN" ]; then
             echo "PR #$PR is $STATE, skipping."
+            echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           gh pr merge "$PR" --squash --delete-branch
           echo "PR #$PR merged successfully."
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+
+  deploy-pages:
+    needs: auto-merge
+    if: needs.auto-merge.outputs.merged == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare site
+        run: |
+          mkdir -p _site
+          cp index.html bow-editor.html _site/
+          cp -r css js _site/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
