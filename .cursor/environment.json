@@ -1,0 +1,3 @@
+{
+  "install": "if [ -n \"$GITHUB_ADMIN_PAT\" ]; then echo \"$GITHUB_ADMIN_PAT\" | gh auth login --with-token && gh auth setup-git; fi"
+}

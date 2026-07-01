@@ -14,6 +14,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 concurrency:
   group: auto-merge-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
@@ -29,7 +30,7 @@ jobs:
       - name: Resolve PR number
         id: pr
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "number=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
@@ -40,7 +41,7 @@ jobs:
       - name: Mark draft PR as ready
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           gh pr ready "${{ steps.pr.outputs.number }}"
           echo "Draft PR marked ready; merge runs on ready_for_review event."
@@ -63,7 +64,7 @@ jobs:
       - name: Merge PR
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           PR="${{ steps.pr.outputs.number }}"
           STATE=$(gh pr view "$PR" --json state -q .state)
@@ -73,3 +74,11 @@ jobs:
           fi
           gh pr merge "$PR" --squash --delete-branch
           echo "PR #$PR merged successfully."
+
+      - name: Trigger Pages deploy
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "Deploy to GitHub Pages" --ref main
+          echo "Pages deploy workflow triggered."
