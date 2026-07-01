@@ -28,10 +28,10 @@ export class Renderer {
 
   drawBlockParticle(p) {
     const size = this._blockSizeFor(p);
-    const gx = Math.floor(p.x / size) * size;
-    const gy = Math.floor(p.y / size) * size;
+    const x = p.cellSize ? p.x : Math.floor(p.x / size) * size;
+    const y = p.cellSize ? p.y : Math.floor(p.y / size) * size;
     this.ctx.fillStyle = p.color;
-    this.ctx.fillRect(gx, gy, size, size);
+    this.ctx.fillRect(x, y, size, size);
   }
 
   drawParticles(particles) {

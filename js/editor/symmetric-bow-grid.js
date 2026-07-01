@@ -1,6 +1,6 @@
 /**
  * 对称弓形网格生成器 — 绘制层数据源
- * 1格 = 1粒子 = 4px · 弓身加粗加长 · 弓弦独立色块列
+ * 1格 = 1粒子 = 4px · gy 向下为正 · 色块落在格内
  */
 export function buildSymmetricBowGrid() {
   const cells = new Map();
@@ -33,14 +33,14 @@ export function buildSymmetricBowGrid() {
     }
   }
 
-  // 握把上半 — 5 列 × 9 行实心块
+  // 握把上半（gy ≤ 0）
   fillRect(-2, -8, 2, 0, (gx) => {
     if (gx === 0) return '#6B3A1F';
     if (Math.abs(gx) === 1) return '#8B4513';
     return '#7A4A2E';
   });
 
-  // 上弓臂脊柱 + 加厚剖面（每节 3～4 格宽）
+  // 上弓臂（gy 负方向 = 向上）
   const spine = [
     [0, -2], [0, -4], [-1, -6], [-2, -8], [-3, -10], [-4, -12], [-5, -14], [-6, -16],
     [-8, -17], [-10, -18], [-12, -19], [-14, -20], [-16, -20], [-18, -20], [-20, -20],
@@ -54,7 +54,6 @@ export function buildSymmetricBowGrid() {
     if (i > 2) add(gx + 1, gy, '#6B3A1F');
   });
 
-  // 梢端实心横条
   fillRect(-21, -20, -17, -20, (gx) => {
     if (gx === -19) return '#A0522D';
     if (gx === -18) return '#8B4513';
@@ -63,7 +62,6 @@ export function buildSymmetricBowGrid() {
   fillRect(-20, -19, -17, -19, () => '#6B3A1F');
   fillRect(-19, -18, -17, -18, () => '#8B4513');
 
-  // 弓臂过渡加厚
   fillRect(-2, -1, 1, -1, (gx) => (gx === 0 ? '#6B3A1F' : '#8B4513'));
   fillRect(-4, -4, -2, -3, () => '#7A4A2E');
   fillRect(-6, -8, -3, -7, () => '#7A4A2E');
@@ -83,7 +81,6 @@ export function buildSymmetricBowGrid() {
   const nockBottom = { gx: -20, gy: 20 };
   const stringGx = -22;
 
-  // 弓弦 — 独立色块列，与弓身同高
   for (let gy = -20; gy <= 20; gy++) {
     const k = `${stringGx},${gy}`;
     if (!cells.has(k)) {

@@ -1,6 +1,7 @@
 import { CUSTOM_BOW_DATA } from './custom-bow-data.js';
 import { GridModel } from './editor/grid-model.js';
 import { fromApplyData, generateExportCode, toApplyData, CELL_SIZE } from './editor/apply.js';
+import { lineCells } from './editor/grid-line.js';
 import { Viewport } from './editor/viewport.js';
 import { GridRenderer } from './editor/grid-renderer.js';
 import { pushBowToGame } from './update-channel.js';
@@ -20,6 +21,7 @@ const state = {
   color: WOOD_COLORS[1],
   history: [],
   lineStart: null,
+  linePreview: null,
 };
 
 let isPointerDown = false;
@@ -51,6 +53,7 @@ function refresh() {
     interactionMode: state.interactionMode,
     tool: state.tool,
     highlightAnchor: state.tool === 'anchor',
+    linePreview: state.linePreview,
   });
   updateMeta();
   exportCode.value = generateExportCode(model);
@@ -78,7 +81,7 @@ function updateMeta() {
 
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
-  const t = e.touches ? e.touches[0] : e;
+  const t = e.touches?.[0] ?? e.changedTouches?.[0] ?? e;
   return {
     sx: (t.clientX - rect.left) * (canvas.width / rect.width),
     sy: (t.clientY - rect.top) * (canvas.height / rect.height),
@@ -91,18 +94,11 @@ function getGrid(e) {
 }
 
 function placeLine(gx0, gy0, gx1, gy1) {
-  const dx = gx1 - gx0;
-  const dy = gy1 - gy0;
-  const steps = Math.max(Math.abs(dx), Math.abs(dy));
-  if (steps === 0) {
-    model.setCell(gx0, gy0, { color: state.color, pinned: false });
-    return;
-  }
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const gx = Math.round(gx0 + dx * t);
-    const gy = Math.round(gy0 + dy * t);
-    model.setCell(gx, gy, { color: state.color, pinned: false });
+  const kind = state.tool === 'string' ? 'string' : 'body';
+  const color = kind === 'string' ? '#E8E8E8' : state.color;
+  for (const { gx, gy } of lineCells(gx0, gy0, gx1, gy1)) {
+    model.setCell(gx, gy, { color, pinned: false, kind });
+    if (kind === 'string') model.stringGx = gx;
   }
 }
 
@@ -165,6 +161,7 @@ function onPointerDown(e) {
 
   if (state.tool === 'line') {
     state.lineStart = { gx, gy };
+    state.linePreview = [{ gx, gy }];
     isPointerDown = true;
     e.preventDefault();
     return;
@@ -215,18 +212,9 @@ function onPointerMove(e) {
   if (!isPointerDown) return;
 
   if (state.tool === 'line' && state.lineStart) {
-    refresh();
     const { gx, gy } = getGrid(e);
-    const ctx = canvas.getContext('2d');
-    const p0 = viewport.gridToScreen(state.lineStart.gx, state.lineStart.gy, canvas.width, canvas.height);
-    const p1 = viewport.gridToScreen(gx, gy, canvas.width, canvas.height);
-    ctx.strokeStyle = 'rgba(255,200,80,0.8)';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(p0.x, p0.y);
-    ctx.lineTo(p1.x, p1.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    state.linePreview = lineCells(state.lineStart.gx, state.lineStart.gy, gx, gy);
+    refresh();
     e.preventDefault();
     return;
   }
@@ -253,6 +241,7 @@ function onPointerUp(e) {
     pushHistory();
     placeLine(state.lineStart.gx, state.lineStart.gy, gx, gy);
     state.lineStart = null;
+    state.linePreview = null;
     refresh();
   }
 
@@ -271,6 +260,7 @@ function onWheel(e) {
 function setInteractionMode(mode) {
   state.interactionMode = mode;
   state.lineStart = null;
+  state.linePreview = null;
   document.getElementById('btn-mode-draw').classList.toggle('active', mode === 'draw');
   document.getElementById('btn-mode-pan').classList.toggle('active', mode === 'pan');
   canvas.classList.toggle('mode-pan', mode === 'pan');

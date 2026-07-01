@@ -14,6 +14,8 @@ function cellToParticle(c, anchor) {
   };
 }
 
+/** dx/dy = 格子左上角相对锚点格 (0,0) 的像素偏移 */
+
 /** 绘制网格 → 游戏粒子数据 */
 export function toApplyData(model) {
   const { anchor } = model;
