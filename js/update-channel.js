@@ -1,4 +1,5 @@
 import { VERSION } from './version.js';
+import { parseVersionFromSource } from './version-parse.js';
 
 const BOW_KEY = 'particle_archery_bow_override';
 const PENDING_KEY = 'particle_archery_pending_bow';
@@ -54,8 +55,7 @@ export async function fetchRemoteVersion() {
     const res = await fetch(`js/version.js?_=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) return null;
     const text = await res.text();
-    const m = text.match(/VERSION\s*=\s*['"]([^'"]+)['"]/);
-    return m?.[1] ?? null;
+    return parseVersionFromSource(text);
   } catch {
     return null;
   }

@@ -45,13 +45,11 @@ flowchart LR
 
 ### 版本号规范
 
-每次功能变更需同步修改三处：
+**唯一来源：`js/version.js` 中的 `VERSION`**
 
-| 文件 | 字段 |
-|------|------|
-| `js/version.js` | `VERSION`、`BUILD_LABEL` |
-| `index.html` | `window.__BOOT_VERSION__` |
-| `bow-editor.html` | `window.__BOOT_VERSION__` |
+- 更新版本时**只改** `js/version.js`（及 `BUILD_LABEL`）
+- `index.html` / `bow-editor.html` 通过 `js/boot.js` 启动时自动读取版本，**不要**在 HTML 中硬编码 `__BOOT_VERSION__`
+- CI 校验：`node scripts/check-version.mjs`
 
 PR 标题建议包含版本号，例如：`feat: 等腰梯形弓身 (v0.6.4)`
 
@@ -61,8 +59,8 @@ PR 标题建议包含版本号，例如：`feat: 等腰梯形弓身 (v0.6.4)`
 
 - 分支名以 `cursor/` 开头
 - PR 目标为 `main`
-- 必需文件存在：`index.html`、`bow-editor.html`、`js/main.js`、`js/version.js`
-- 三处版本号一致
+- 必需文件存在：`index.html`、`bow-editor.html`、`js/main.js`、`js/version.js`、`js/boot.js`
+- 版本单一来源校验通过（`scripts/check-version.mjs`）
 - Draft PR 会先被自动标记为 Ready
 
 ## 部署
@@ -103,4 +101,4 @@ PR 标题建议包含版本号，例如：`feat: 等腰梯形弓身 (v0.6.4)`
 | PR 未自动合并 | 检查分支是否 `cursor/` 前缀、版本号是否一致 |
 | 合并后未部署 | 查看 Actions 中 `Deploy to GitHub Pages` 的 workflow_dispatch 运行 |
 | `gh pr create` 403 | 检查 Cursor Secrets 中 `GITHUB_ADMIN_PAT` 是否有效 |
-| 线上版本未更新 | 确认 `__BOOT_VERSION__` 与 `js/version.js` 已同步递增 |
+| 线上版本未更新 | 硬刷新或点「更新」；确认 `js/version.js` 已递增且 Pages 已部署 |

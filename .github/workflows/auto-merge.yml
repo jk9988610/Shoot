@@ -59,20 +59,13 @@ jobs:
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         run: |
           set -e
-          for f in index.html bow-editor.html js/main.js js/version.js; do
+          for f in index.html bow-editor.html js/main.js js/version.js js/boot.js; do
             test -f "$f" || { echo "Missing: $f"; exit 1; }
           done
 
-          VERSION=$(sed -n "s/.*VERSION = '\\([^']*\\)'.*/\\1/p" js/version.js | head -1)
-          INDEX_V=$(sed -n "s/.*__BOOT_VERSION__ = '\\([^']*\\)'.*/\\1/p" index.html | head -1)
-          EDITOR_V=$(sed -n "s/.*__BOOT_VERSION__ = '\\([^']*\\)'.*/\\1/p" bow-editor.html | head -1)
+          node scripts/check-version.mjs
 
-          if [ -z "$VERSION" ] || [ "$VERSION" != "$INDEX_V" ] || [ "$VERSION" != "$EDITOR_V" ]; then
-            echo "Version mismatch: version.js=$VERSION index.html=$INDEX_V bow-editor.html=$EDITOR_V"
-            exit 1
-          fi
-
-          echo "Validation passed (v${VERSION})."
+          echo "Validation passed."
 
       - name: Merge PR
         id: merge
