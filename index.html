@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <title>粒子弓箭世界 v0.6.1 — Particle Archery</title>
-  <link rel="stylesheet" href="css/style.css?v=0.6.1">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>粒子弓箭世界 — Particle Archery</title>
+  <link rel="stylesheet" id="app-css" href="css/style.css">
 </head>
 <body>
   <div id="header">
@@ -16,7 +18,7 @@
     <button id="update-btn" type="button" title="应用弓身更新 / 检查新版本 / 刷新缓存">更新</button>
     <span id="update-status" class="update-status"></span>
     <button id="debug-toggle-btn" type="button" class="active">隐藏调试</button>
-    <a href="bow-editor.html?v=0.6.1" class="editor-link">弓身绘制</a>
+    <a id="editor-link" class="editor-link" href="bow-editor.html">弓身绘制</a>
   </div>
 
   <div id="app-body">
@@ -33,7 +35,7 @@
           </div>
         </div>
 
-        <div id="phase-badge">阶段 1-5 · 粒子弓射箭 <span id="version-badge">v0.6.1</span></div>
+        <div id="phase-badge">阶段 1-5 · 粒子弓射箭 <span id="version-badge"></span></div>
         <div id="score-popup"></div>
       </div>
 
@@ -50,6 +52,18 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=0.6.1"></script>
+  <script>
+    window.__BOOT_VERSION__ = '0.6.2';
+  </script>
+  <script type="module">
+    const params = new URLSearchParams(location.search);
+    const v = params.get('v') || window.__BOOT_VERSION__;
+    const bust = params.get('_') || Date.now();
+    document.title = `粒子弓箭世界 v${v} — Particle Archery`;
+    document.getElementById('app-css').href = `css/style.css?v=${v}&_=${bust}`;
+    document.getElementById('editor-link').href = `bow-editor.html?v=${v}&_=${bust}`;
+    document.getElementById('version-badge').textContent = `v${v}`;
+    import(`./js/main.js?v=${v}&_=${bust}`);
+  </script>
 </body>
 </html>

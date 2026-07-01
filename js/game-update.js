@@ -1,5 +1,6 @@
 import { VERSION } from './version.js';
 import {
+  clearPendingBowUpdate,
   fetchRemoteVersion,
   hardReload,
   hasPendingBowUpdate,
@@ -26,23 +27,29 @@ export async function runGameUpdate() {
   btn.disabled = true;
   setStatus('检查更新…');
 
-  const pending = hasPendingBowUpdate();
-  const remoteVer = await fetchRemoteVersion();
+  try {
+    const pending = hasPendingBowUpdate();
+    const remoteVer = await fetchRemoteVersion();
 
-  if (pending) {
-    setStatus('应用编辑器弓身…', 'pending');
-    setTimeout(hardReload, 300);
-    return;
+    if (pending) {
+      clearPendingBowUpdate();
+      setStatus('应用编辑器弓身…', 'pending');
+      hardReload(VERSION);
+      return;
+    }
+
+    if (remoteVer && remoteVer !== VERSION) {
+      setStatus(`正在更新到 v${remoteVer}…`, 'ok');
+      hardReload(remoteVer);
+      return;
+    }
+
+    setStatus('刷新缓存…', 'ok');
+    hardReload(VERSION);
+  } catch {
+    setStatus('更新失败，请重试', 'error');
+    btn.disabled = false;
   }
-
-  if (remoteVer && remoteVer !== VERSION) {
-    setStatus(`发现 v${remoteVer}，刷新中…`, 'ok');
-    setTimeout(hardReload, 400);
-    return;
-  }
-
-  setStatus('刷新缓存…');
-  setTimeout(hardReload, 200);
 }
 
 export function initUpdateButton() {

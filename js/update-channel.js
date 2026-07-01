@@ -52,6 +52,7 @@ export function clearBowOverride() {
 export async function fetchRemoteVersion() {
   try {
     const res = await fetch(`js/version.js?_=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return null;
     const text = await res.text();
     const m = text.match(/VERSION\s*=\s*['"]([^'"]+)['"]/);
     return m?.[1] ?? null;
@@ -60,9 +61,13 @@ export async function fetchRemoteVersion() {
   }
 }
 
-/** 带缓存破坏的页面重载 */
-export function hardReload() {
+/**
+ * 强制加载指定版本 — 通过 URL ?v= 驱动 index.html 动态 import
+ * @param {string} [targetVersion] 目标版本号，默认保持当前 VERSION
+ */
+export function hardReload(targetVersion = VERSION) {
   const url = new URL(location.href);
+  url.searchParams.set('v', targetVersion);
   url.searchParams.set('_', String(Date.now()));
-  location.replace(url.toString());
+  location.replace(url.pathname + url.search + url.hash);
 }

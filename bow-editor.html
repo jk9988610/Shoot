@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>弓身绘制工具 — Particle Archery</title>
-  <link rel="stylesheet" href="css/bow-editor.css?v=0.6.1">
+  <link rel="stylesheet" id="editor-css" href="css/bow-editor.css">
 </head>
 <body>
   <header class="editor-header">
@@ -13,7 +13,7 @@
       <h1>弓身绘制工具</h1>
       <p>绘制层(网格) → 应用层(游戏) · 1格=1粒子=4px · 弓身/弓弦色块满格</p>
     </div>
-    <a href="index.html" class="back-link">← 返回游戏</a>
+    <a href="index.html" class="back-link" id="back-link">← 返回游戏</a>
   </header>
 
   <main class="editor-main">
@@ -85,6 +85,16 @@
     </section>
   </main>
 
-  <script type="module" src="js/bow-editor.js?v=0.6.1"></script>
+  <script>
+    window.__BOOT_VERSION__ = '0.6.2';
+  </script>
+  <script type="module">
+    const params = new URLSearchParams(location.search);
+    const v = params.get('v') || window.__BOOT_VERSION__;
+    const bust = params.get('_') || Date.now();
+    document.getElementById('editor-css').href = `css/bow-editor.css?v=${v}&_=${bust}`;
+    document.getElementById('back-link').href = `index.html?v=${v}&_=${bust}`;
+    import(`./js/bow-editor.js?v=${v}&_=${bust}`);
+  </script>
 </body>
 </html>
