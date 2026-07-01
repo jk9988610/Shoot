@@ -52,18 +52,16 @@
     </div>
   </div>
 
-  <script>
-    window.__BOOT_VERSION__ = '0.6.5';
-  </script>
   <script type="module">
-    const params = new URLSearchParams(location.search);
-    const v = params.get('v') || window.__BOOT_VERSION__;
-    const bust = params.get('_') || Date.now();
-    document.title = `粒子弓箭世界 v${v} — Particle Archery`;
-    document.getElementById('app-css').href = `css/style.css?v=${v}&_=${bust}`;
-    document.getElementById('editor-link').href = `bow-editor.html?v=${v}&_=${bust}`;
-    document.getElementById('version-badge').textContent = `v${v}`;
-    import(`./js/main.js?v=${v}&_=${bust}`);
+    import { bootPage, showBootError } from './js/boot.js';
+    bootPage({
+      css: 'css/style.css',
+      cssId: 'app-css',
+      module: './js/main.js',
+      title: (v) => `粒子弓箭世界 v${v} — Particle Archery`,
+      badge: 'version-badge',
+      links: [{ id: 'editor-link', href: (v, bust) => `bow-editor.html?v=${v}&_=${bust}` }],
+    }).catch(showBootError);
   </script>
 </body>
 </html>
