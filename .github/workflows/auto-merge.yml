@@ -1,5 +1,6 @@
 name: Auto Merge AI PRs
 
+# cursor/* 分支 PR 校验通过后自动 squash 合并，并触发 Pages 部署。
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
@@ -7,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: PR number to merge (optional, defaults to triggering PR)
+        description: PR number to merge
         required: false
         type: string
 
@@ -46,7 +47,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           gh pr ready "${{ steps.pr.outputs.number }}"
-          echo "Draft PR marked ready; merge runs on ready_for_review event."
+          echo "Draft PR marked as ready; merge runs on ready_for_review event."
 
       - name: Validate project files
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -57,11 +58,21 @@ jobs:
       - name: Run validation checks
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         run: |
-          test -f index.html
-          test -f bow-editor.html
-          test -f js/main.js
-          test -f js/version.js
-          echo "Validation passed."
+          set -e
+          for f in index.html bow-editor.html js/main.js js/version.js; do
+            test -f "$f" || { echo "Missing: $f"; exit 1; }
+          done
+
+          VERSION=$(sed -n "s/.*VERSION = '\\([^']*\\)'.*/\\1/p" js/version.js | head -1)
+          INDEX_V=$(sed -n "s/.*__BOOT_VERSION__ = '\\([^']*\\)'.*/\\1/p" index.html | head -1)
+          EDITOR_V=$(sed -n "s/.*__BOOT_VERSION__ = '\\([^']*\\)'.*/\\1/p" bow-editor.html | head -1)
+
+          if [ -z "$VERSION" ] || [ "$VERSION" != "$INDEX_V" ] || [ "$VERSION" != "$EDITOR_V" ]; then
+            echo "Version mismatch: version.js=$VERSION index.html=$INDEX_V bow-editor.html=$EDITOR_V"
+            exit 1
+          fi
+
+          echo "Validation passed (v${VERSION})."
 
       - name: Merge PR
         id: merge
@@ -80,10 +91,10 @@ jobs:
           echo "PR #$PR merged successfully."
           echo "merged=true" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger Pages deploy on main
+      - name: Trigger Pages deploy
         if: steps.merge.outputs.merged == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run "Deploy to GitHub Pages" --ref main --repo "${{ github.repository }}"
-          echo "Triggered Deploy to GitHub Pages on main."
+          echo "Triggered Deploy to GitHub Pages."
